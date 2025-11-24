@@ -1,0 +1,44 @@
+
+> temp_app@0.1.0 dev
+> next dev
+
+   笆ｲ Next.js 16.0.3 (Turbopack)
+   - Local:         http://localhost:3000
+   - Network:       http://192.168.0.15:3000
+   - Environments: .env.local
+
+ 笨・Starting...
+ 笨・Ready in 1579ms
+ 笳・Compiling /login ...
+ GET /login 200 in 6.2s (compile: 5.4s, render: 890ms)
+ GET /account/verification 200 in 1222ms (compile: 892ms, render: 330ms)
+ GET /login 200 in 90ms (compile: 9ms, render: 81ms)
+ GET /login 200 in 150ms (compile: 37ms, render: 113ms)
+ GET /login 200 in 471ms (compile: 38ms, render: 433ms)
+ GET /login 200 in 210ms (compile: 63ms, render: 148ms)
+ GET /login 200 in 181ms (compile: 11ms, render: 169ms)
+VerificationPage rendered (Minimal)
+ GET /account/verification 200 in 1434ms (compile: 579ms, render: 854ms)
+VerificationPage rendered (Minimal)
+ GET /account/verification 200 in 120ms (compile: 8ms, render: 112ms)
+ GET /login 200 in 118ms (compile: 35ms, render: 83ms)
+VerificationPage rendered (Minimal)
+ GET /account/verification 200 in 116ms (compile: 31ms, render: 86ms)
+ GET /login 200 in 78ms (compile: 5ms, render: 72ms)
+ GET /login 200 in 113ms (compile: 6ms, render: 108ms)
+ GET /login 200 in 144ms (compile: 9ms, render: 135ms)
+ GET /login 200 in 147ms (compile: 8ms, render: 139ms)
+ GET /login 200 in 73ms (compile: 4ms, render: 69ms)
+ GET /login 200 in 84ms (compile: 5ms, render: 79ms)
+ 笨・Compiled in 71ms
+ 笨・Compiled in 121ms
+ 笨・Compiled in 311ms
+ 笨・Compiled in 56ms
+ 笨・Compiled in 73ms
+ 笨・Compiled in 118ms
+ 笨・Compiled in 46ms
+ 笨・Compiled in 107ms
+ 笨・Compiled in 61ms
+ 笨・Compiled in 81ms
+ 笨・Compiled in 80ms
+ 笨・Compiled in 88ms
