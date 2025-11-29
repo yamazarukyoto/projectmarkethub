@@ -35,6 +35,14 @@ export const updateUser = async (uid: string, data: Partial<User>): Promise<void
     await updateDoc(docRef, data);
 };
 
+export const updateUserRating = async (uid: string, rating: number, count: number): Promise<void> => {
+    const docRef = doc(db, "users", uid);
+    await updateDoc(docRef, {
+        rating,
+        reviewCount: count
+    });
+};
+
 // Job Functions
 export const createJob = async (job: Omit<Job, "id">): Promise<string> => {
     const docRef = await addDoc(collection(db, "jobs"), job);
@@ -163,4 +171,10 @@ export const addNegotiationMessage = async (proposalId: string, message: { sende
 
         await updateDoc(docRef, updates);
     }
+};
+
+// Task Functions
+export const createTaskSubmission = async (submission: any): Promise<string> => {
+    const docRef = await addDoc(collection(db, "task_submissions"), submission);
+    return docRef.id;
 };

@@ -7,13 +7,14 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { getJob, createProposal, getWorkerProposals, getContracts } from "@/lib/db";
+import { getJob, createProposal, getWorkerProposals, getContracts, createTaskSubmission } from "@/lib/db";
 import { Job, Proposal } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { ArrowLeft, Clock, DollarSign, Calendar, Tag, CheckCircle, Paperclip, Download } from "lucide-react";
 import { Timestamp } from "firebase/firestore";
+import { TaskWorkspace } from "@/components/features/task/TaskWorkspace";
 
 const proposalSchema = z.object({
     price: z.number().min(1, "金額を入力してください"),
@@ -97,6 +98,25 @@ export default function WorkerJobDetailPage() {
             alert("エラーが発生しました");
         } finally {
             setSubmitting(false);
+        }
+    };
+
+    const handleTaskSubmit = async (answers: any[]) => {
+        if (!user || !job) return;
+        try {
+            await createTaskSubmission({
+                jobId: job.id,
+                workerId: user.uid,
+                answers,
+                status: "pending",
+                startedAt: Timestamp.now(),
+                submittedAt: Timestamp.now(),
+            });
+            setHasApplied(true);
+            alert("タスクを提出しました！");
+        } catch (err) {
+            console.error(err);
+            alert("エラーが発生しました");
         }
     };
 
@@ -185,71 +205,89 @@ export default function WorkerJobDetailPage() {
                     </Card>
                 </div>
 
-                {/* Application Form */}
+                {/* Application Form or Task Workspace */}
                 <div className="space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-xl font-bold text-secondary">この案件に応募する</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {hasApplied ? (
-                                <div className="text-center py-8">
-                                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                        <CheckCircle className="text-green-600" size={32} />
+                    {job.type === 'task' ? (
+                        hasApplied ? (
+                            <Card>
+                                <CardContent className="pt-6">
+                                    <div className="text-center py-8">
+                                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <CheckCircle className="text-green-600" size={32} />
+                                        </div>
+                                        <h3 className="text-lg font-bold text-green-800 mb-2">提出済み</h3>
+                                        <p className="text-gray-600 mb-4">このタスクは既に提出しています。</p>
                                     </div>
-                                    <h3 className="text-lg font-bold text-green-800 mb-2">応募済み</h3>
-                                    <p className="text-gray-600 mb-4">この案件には既に応募しています。</p>
-                                    <div className="flex flex-col gap-2">
-                                        <Link href="/worker/applications">
-                                            <Button variant="outline" className="w-full">応募管理へ</Button>
-                                        </Link>
-                                        {contractId && (
-                                            <Link href={`/worker/contracts/${contractId}`}>
-                                                <Button className="w-full bg-accent hover:bg-accent/90 text-white">契約詳細・納品へ</Button>
+                                </CardContent>
+                            </Card>
+                        ) : (
+                            <TaskWorkspace job={job} onSubmit={handleTaskSubmit} />
+                        )
+                    ) : (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-xl font-bold text-secondary">この案件に応募する</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                {hasApplied ? (
+                                    <div className="text-center py-8">
+                                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <CheckCircle className="text-green-600" size={32} />
+                                        </div>
+                                        <h3 className="text-lg font-bold text-green-800 mb-2">応募済み</h3>
+                                        <p className="text-gray-600 mb-4">この案件には既に応募しています。</p>
+                                        <div className="flex flex-col gap-2">
+                                            <Link href="/worker/applications">
+                                                <Button variant="outline" className="w-full">応募管理へ</Button>
                                             </Link>
-                                        )}
+                                            {contractId && (
+                                                <Link href={`/worker/contracts/${contractId}`}>
+                                                    <Button className="w-full bg-accent hover:bg-accent/90 text-white">契約詳細・納品へ</Button>
+                                                </Link>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            ) : job.status !== 'open' ? (
-                                <div className="text-center py-8 text-gray-500">
-                                    この案件は現在募集していません。
-                                </div>
-                            ) : (
-                                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                                    <Input
-                                        label="提案金額 (円)"
-                                        type="number"
-                                        placeholder="50000"
-                                        error={errors.price?.message}
-                                        {...register("price", { valueAsNumber: true })}
-                                    />
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">完了予定日</label>
+                                ) : job.status !== 'open' ? (
+                                    <div className="text-center py-8 text-gray-500">
+                                        この案件は現在募集していません。
+                                    </div>
+                                ) : (
+                                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                                         <Input
-                                            type="date"
-                                            error={errors.estimatedDuration?.message}
-                                            {...register("estimatedDuration")}
+                                            label="提案金額 (円)"
+                                            type="number"
+                                            placeholder="50000"
+                                            error={errors.price?.message}
+                                            {...register("price", { valueAsNumber: true })}
                                         />
-                                    </div>
 
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">メッセージ</label>
-                                        <textarea
-                                            className="w-full rounded-lg border border-gray-300 px-3 py-2 h-32 focus:border-primary focus:ring-1 focus:ring-primary"
-                                            placeholder="自己PRや提案内容を入力してください"
-                                            {...register("message")}
-                                        />
-                                        {errors.message && <p className="mt-1 text-sm text-danger">{errors.message.message}</p>}
-                                    </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">完了予定日</label>
+                                            <Input
+                                                type="date"
+                                                error={errors.estimatedDuration?.message}
+                                                {...register("estimatedDuration")}
+                                            />
+                                        </div>
 
-                                    <Button type="submit" className="w-full" disabled={submitting}>
-                                        {submitting ? "送信中..." : "応募する"}
-                                    </Button>
-                                </form>
-                            )}
-                        </CardContent>
-                    </Card>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">メッセージ</label>
+                                            <textarea
+                                                className="w-full rounded-lg border border-gray-300 px-3 py-2 h-32 focus:border-primary focus:ring-1 focus:ring-primary"
+                                                placeholder="自己PRや提案内容を入力してください"
+                                                {...register("message")}
+                                            />
+                                            {errors.message && <p className="mt-1 text-sm text-danger">{errors.message.message}</p>}
+                                        </div>
+
+                                        <Button type="submit" className="w-full" disabled={submitting}>
+                                            {submitting ? "送信中..." : "応募する"}
+                                        </Button>
+                                    </form>
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
             </div>
         </div>

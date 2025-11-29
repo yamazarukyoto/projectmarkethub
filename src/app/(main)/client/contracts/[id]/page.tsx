@@ -11,6 +11,8 @@ import { ArrowLeft, CheckCircle, Clock, FileText, CreditCard } from "lucide-reac
 import { doc, getDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { PaymentModal } from "@/components/features/contract/PaymentModal";
+import { ReviewModal } from "@/components/features/contract/ReviewModal";
+import { updateUserRating } from "@/lib/db";
 
 export default function ClientContractDetailPage() {
     const params = useParams();
@@ -19,6 +21,7 @@ export default function ClientContractDetailPage() {
     const [contract, setContract] = useState<Contract | null>(null);
     const [loading, setLoading] = useState(true);
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+    const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
     const [clientSecret, setClientSecret] = useState<string | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
 
@@ -89,16 +92,35 @@ export default function ClientContractDetailPage() {
             if (data.skipped) {
                 setContract({ ...contract, status: 'completed' });
                 alert("検収（デモ）が完了し、支払いが確定しました。");
+                setIsReviewModalOpen(true); // Open review modal
                 return;
             }
 
             setContract({ ...contract, status: 'completed' });
             alert("検収が完了し、支払いが確定しました。");
+            setIsReviewModalOpen(true); // Open review modal
         } catch (error) {
             console.error("Error capturing payment:", error);
             alert("支払い確定処理中にエラーが発生しました。");
         } finally {
             setIsProcessing(false);
+        }
+    };
+
+    const handleReviewSubmit = async (rating: number, comment: string) => {
+        if (!contract) return;
+        // In a real app, we would save the review to a 'reviews' collection
+        // and update the user's average rating.
+        // For now, we just update the user rating directly for simplicity.
+        // Note: This should ideally be done via an API to ensure security and atomicity.
+        
+        try {
+            // Mock calculation: just set the new rating (in reality, calculate average)
+            await updateUserRating(contract.workerId, rating, 1); // 1 is dummy count increment
+            alert("評価を送信しました。");
+        } catch (error) {
+            console.error("Error submitting review:", error);
+            alert("評価の送信に失敗しました。");
         }
     };
 
@@ -210,6 +232,12 @@ export default function ClientContractDetailPage() {
                     }}
                 />
             )}
+
+            <ReviewModal
+                isOpen={isReviewModalOpen}
+                onClose={() => setIsReviewModalOpen(false)}
+                onSubmit={handleReviewSubmit}
+            />
         </div>
     );
 }

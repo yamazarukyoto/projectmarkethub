@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { updateContractStatus, submitContractDelivery } from "@/lib/db";
+import { updateContractStatus, submitContractDelivery, updateUserRating } from "@/lib/db";
 import { Contract } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { ArrowLeft, CheckCircle, Clock, FileText, Upload } from "lucide-react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { ReviewModal } from "@/components/features/contract/ReviewModal";
 
 export default function WorkerContractDetailPage() {
     const params = useParams();
@@ -21,6 +22,7 @@ export default function WorkerContractDetailPage() {
     const [deliveryFileUrl, setDeliveryFileUrl] = useState("");
     const [deliveryMessage, setDeliveryMessage] = useState("");
     const [submitting, setSubmitting] = useState(false);
+    const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
 
     useEffect(() => {
         const fetchContract = async () => {
@@ -35,6 +37,18 @@ export default function WorkerContractDetailPage() {
         };
         fetchContract();
     }, [params.id]);
+
+    const handleReviewSubmit = async (rating: number, comment: string) => {
+        if (!contract) return;
+        try {
+            // Mock calculation: just set the new rating (in reality, calculate average)
+            await updateUserRating(contract.clientId, rating, 1); // 1 is dummy count increment
+            alert("評価を送信しました。");
+        } catch (error) {
+            console.error("Error submitting review:", error);
+            alert("評価の送信に失敗しました。");
+        }
+    };
 
     if (loading) return <div className="p-8 text-center">読み込み中...</div>;
     if (!contract) return <div className="p-8 text-center">契約が見つかりません</div>;
@@ -182,10 +196,23 @@ export default function WorkerContractDetailPage() {
                                     クライアントの検収待ちです。
                                 </p>
                             )}
+                            {contract.status === 'completed' && (
+                                <div className="mt-4">
+                                    <Button onClick={() => setIsReviewModalOpen(true)} variant="outline">
+                                        クライアントを評価する
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </CardContent>
             </Card>
+
+            <ReviewModal
+                isOpen={isReviewModalOpen}
+                onClose={() => setIsReviewModalOpen(false)}
+                onSubmit={handleReviewSubmit}
+            />
         </div>
     );
 }
