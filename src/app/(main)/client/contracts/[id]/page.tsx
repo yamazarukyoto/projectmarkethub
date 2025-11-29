@@ -52,6 +52,12 @@ export default function ClientContractDetailPage() {
             const data = await res.json();
             if (data.error) throw new Error(data.error);
             
+            if (data.skipped) {
+                setContract({ ...contract, status: 'escrow' });
+                alert("仮払い（デモ）が完了しました。");
+                return;
+            }
+
             setClientSecret(data.clientSecret);
             setIsPaymentModalOpen(true);
         } catch (error) {
@@ -79,6 +85,12 @@ export default function ClientContractDetailPage() {
             });
             const data = await res.json();
             if (data.error) throw new Error(data.error);
+
+            if (data.skipped) {
+                setContract({ ...contract, status: 'completed' });
+                alert("検収（デモ）が完了し、支払いが確定しました。");
+                return;
+            }
 
             setContract({ ...contract, status: 'completed' });
             alert("検収が完了し、支払いが確定しました。");

@@ -35,7 +35,108 @@
 
 ---
 
+## 1.3 サイトマップ & 画面遷移図 (Site Map & Navigation)
+
+```text
+[ Visitor / Unauthenticated ]
+      |
+      +-- Top Page (/)
+      |     |
+      |     +-- Login (/login) ------------------------+
+      |     +-- Register (/register) ------------------|
+      |                                                |
+      v                                                v
+[ Authenticated User ] <-----------------------( Auth Guard )
+      |
+      +-- [ Header: Mode Switcher (Client <-> Worker) ]
+      |
+      +-- [ Common Pages ]
+      |     +-- Account Settings
+      |     |     +-- Profile (/account/profile)
+      |     |     +-- Verification (/account/verification)
+      |     |     +-- Notifications (/account/notifications)
+      |     +-- Messages (/messages)
+      |           +-- Chat Room (/messages/[roomId])
+      |
+      +-- [ Client Mode ] (発注者)
+      |     |
+      |     +-- Dashboard (/client/dashboard)
+      |     |
+      |     +-- Job Management
+      |     |     +-- Create New Job (/client/jobs/new) [Header Link]
+      |     |     +-- Job List (/client/jobs)
+      |     |     +-- Job Detail (/client/jobs/[id])
+      |     |           +-- Edit Job
+      |     |           +-- Applicant List (Project)
+      |     |           +-- Proposal List (Competition)
+      |     |           +-- Task Approvals (Task)
+      |     |
+      |     +-- Contract Management
+      |           +-- Contract Detail (/client/contracts/[id])
+      |                 +-- Payment (Escrow)
+      |                 +-- Acceptance (Transfer)
+      |
+      +-- [ Worker Mode ] (受注者)
+            |
+            +-- Dashboard (/worker/dashboard)
+            |
+            +-- Job Search
+            |     +-- Search (/worker/search)
+            |     +-- Job Detail (/worker/jobs/[id])
+            |           +-- Apply / Submit Proposal
+            |
+            +-- Contract Management
+            |     +-- Application List (/worker/applications)
+            |     +-- Contract Detail (/worker/contracts/[id])
+            |           +-- Submit Deliverable
+            |
+            +-- Settings
+                  +-- Public Profile (/account/worker/profile)
+                  +-- Payout Settings (/account/worker/payout)
+```
+
+---
+
 ## 2. 業務フロー詳細設計 (Workflow Definitions)
+
+### 2.0 システム全体フロー概要 (System Workflow Overview)
+
+```text
+                                    [ MONEY FLOW ]
+                                          |
+[ CLIENT ]                           [ PLATFORM ]                           [ WORKER ]
+    |                                     |                                     |
+    | (1) 募集 (Job Creation)             |                                     |
+    |------------------------------------>|                                     |
+    |                                     | (2) 検索・閲覧 (Search)             |
+    |                                     |------------------------------------>|
+    |                                     |                                     |
+    |                                     | (3) 応募/提案 (Apply/Proposal)      |
+    |<------------------------------------|-------------------------------------|
+    |                                     |                                     |
+    | (4) 契約/採用 (Contract/Adopt)      |                                     |
+    |------------------------------------>|------------------------------------>|
+    |                                     |                                     |
+    | (5) 仮払い (Escrow Payment)         |                                     |
+    |     [CREDIT CARD] --(Charge)------> | [STRIPE HOLDING]                    |
+    |------------------------------------>| (Status: Escrow)                    |
+    |                                     |------------------------------------>|
+    |                                     |      (Notification: Start Work)     |
+    |                                     |                                     |
+    |                                     | (6) 業務・納品 (Work & Delivery)    |
+    |<------------------------------------|-------------------------------------|
+    |                                     |                                     |
+    | (7) 検収 (Acceptance)               |                                     |
+    |------------------------------------>|                                     |
+    |                                     | (8) 本払い (Transfer Payment)       |
+    |                                     | [STRIPE HOLDING] --(Transfer)-----> | [BANK ACCOUNT]
+    |                                     | (Status: Completed)                 |
+    |                                     |------------------------------------>|
+    |                                     |                                     |
+    | (9) 評価 (Review)                   | (9) 評価 (Review)                   |
+    |------------------------------------>|<------------------------------------|
+    v                                     v                                     v
+```
 
 CrowdWorksの仕様に準拠し、以下の3方式を実装する。**時間単価制は採用しない。**
 全てのフローにおいて、**「エスクロー（仮払い）」**が必須であり、ワーカーの報酬未払いリスクを排除する。
@@ -61,73 +162,89 @@ stateDiagram-v2
     InProgress --> Disputed: トラブル報告
 ```
 
-#### 詳細ステップ & ロジック
+#### 詳細ステップ & 画面UI仕様
 
 **Phase 1: マッチング (Matching)**
 1.  **募集 (Client)**
-    *   **Action:** `/client/jobs/new` で仕事作成。
-    *   **Input:** タイトル、詳細(MD)、カテゴリ、予算、期限、添付ファイル。
+    *   **Page:** `/client/jobs/new`
+    *   **UI:**
+        *   `JobForm`: タイトル、詳細(MDエディタ)、カテゴリ、予算、期限、添付ファイル入力。
+        *   `SubmitButton`: 「公開する」
     *   **DB:** `jobs` 作成 (`status: 'open'`, `budgetType: 'fixed'`).
 2.  **検索 & 応募 (Worker)**
-    *   **Action:** `/worker/search` で検索し、詳細画面へ。
-    *   **Action:** 「応募する」ボタン押下。
-    *   **Input:** 提示金額(税抜)、完了予定日、メッセージ。
+    *   **Page:** `/worker/jobs/[id]`
+    *   **UI:**
+        *   `JobDetails`: 案件詳細表示。
+        *   `ProposalForm`: 提示金額(税抜)、完了予定日、メッセージ入力エリア。
+        *   `ApplyButton`: 「応募する」（未ログイン時はログインへ誘導）。
     *   **DB:** `proposals` 作成 (`status: 'pending'`).
-    *   **Notification:** クライアントへ「新着応募」通知。
 3.  **条件交渉 (Both)**
-    *   **UI:** `/messages/[roomId]` でチャット。
-    *   **Action:**
-        *   **Client:** 応募内容を見て「新しい条件を提示」または「この条件で契約」。
-        *   **Worker:** クライアントの提示に対し「同意」または「条件を変更して再提示」。
-    *   **Logic:** `proposals` ドキュメント内の `negotiationHistory` 配列に履歴を追記し、最新の `price` を更新する。
+    *   **Page:** `/messages/[roomId]`
+    *   **UI:**
+        *   `ChatBox`: メッセージ送受信。
+        *   `ConditionPanel`: 現在の提示条件（金額・納期）を表示。
+        *   `NegotiationActions`:
+            *   **Client:** 「条件変更を提示」「この条件で契約する」ボタン。
+            *   **Worker:** 「条件変更を提示」「同意する」ボタン。
 
 **Phase 2: 契約 & 仮払い (Contract & Escrow)**
 4.  **契約締結 (Client)**
+    *   **Page:** `/messages/[roomId]` または `/client/jobs/[id]` (応募者一覧)
     *   **Action:** クライアントが最終条件で「契約する」ボタン押下。
-    *   **DB:** `contracts` 作成 (`status: 'waiting_for_escrow'`). `jobs.status` は `filled` (募集終了) または `open` (複数名採用時) に設定。
-    *   **Notification:** ワーカーへ「契約が締結されました。仮払いを待ってください」と通知。
+    *   **DB:** `contracts` 作成 (`status: 'waiting_for_escrow'`).
+    *   **Transition:** 画面は自動的に `/client/contracts/[id]` へ遷移する。
 5.  **仮払い (Client)**
-    *   **UI:** 契約画面 (`/client/contracts/[id]`) に「仮払いへ進む」ボタン出現。
-    *   **Action:** Stripe Elements (Card) で決済。
-    *   **System (Backend):** `/api/stripe/create-payment-intent`
-        *   `stripe.paymentIntents.create` を実行。
-        *   `amount`: 契約金額 + 消費税。
-        *   `currency`: `jpy`.
-        *   `capture_method`: `'manual'` (**重要: ここでは決済確定させない**).
-        *   `transfer_data`: `{ destination: worker_stripe_account_id }`.
-        *   `application_fee_amount`: 契約金額の 5% (プラットフォーム手数料).
-    *   **DB:** 成功時、`contracts.status` → `'escrow'`. `stripePaymentIntentId` を保存。
-    *   **Notification:** ワーカーへ「仮払いが完了しました。業務を開始してください」と通知。
+    *   **Page:** `/client/contracts/[id]`
+    *   **UI:**
+        *   `ContractStatus`: 「仮払い待ち」ステータス表示。
+        *   `PaymentCard`: 請求額内訳（契約金額＋消費税）を表示。
+        *   `PaymentButton`: **「仮払いへ進む（Stripe決済）」ボタン**。
+            *   **Action:** このボタンをクリックすると、画面中央に `PaymentModal` (Stripe Elements) がオーバーレイ表示される。
+            *   **Stripe Flow:**
+                1.  クレジットカード情報を入力。
+                2.  「支払う」ボタン押下。
+                3.  Stripe API `PaymentIntent` (Separate Charges and Transfers) が実行され、プラットフォームが資金を預かる。
+                4.  成功時、モーダルが閉じ、トースト通知「仮払いが完了しました」を表示。
+                5.  画面リロードまたはステータス更新で「業務中（仮払い済み）」表示に切り替わる。
+    *   **DB:** `contracts.status` → `'escrow'`.
 
 **Phase 3: 業務 & 納品 (Work & Delivery)**
 6.  **業務開始 (Worker)**
-    *   **Constraint:** `status === 'escrow'` になるまで、納品ボタンは無効化(Disabled)する。
+    *   **Page:** `/worker/contracts/[id]`
+    *   **UI:**
+        *   `ContractStatus`: 「業務中（仮払い済み）」表示。
+        *   `DeliveryForm`:
+            *   ファイルアップロード (Drag & Drop)。
+            *   コメント入力エリア。
+            *   `SubmitButton`: 「納品報告する」（`status === 'escrow'` 時のみ活性化）。
 7.  **納品 (Worker)**
-    *   **Action:** 成果物ファイルをアップロード、またはURLを記載し、メッセージを添えて「納品報告」ボタン押下。
-    *   **DB:** `contracts.status` → `'submitted'`. `contracts.deliveryFileUrl` 更新。
-    *   **Notification:** クライアントへ「納品報告がありました。検収してください」と通知。
+    *   **Action:** 納品報告ボタン押下。
+    *   **DB:** `contracts.status` → `'submitted'`.
 
 **Phase 4: 検収 & 支払い (Acceptance & Payment)**
 8.  **検収 (Client)**
-    *   **UI:** 契約画面に「検収完了」と「修正依頼」ボタン出現。
-    *   **Case A: 修正依頼 (Reject)**
-        *   **Input:** 修正指示メッセージ (必須)。
-        *   **DB:** `contracts.status` → `'in_progress'`.
-        *   **Notification:** ワーカーへ「修正依頼が届きました」と通知。
-    *   **Case B: 検収完了 (Accept)**
-        *   **Action:** 「検収完了」ボタン押下。
-        *   **System (Backend):** `/api/stripe/capture-payment-intent`
-            *   `stripe.paymentIntents.capture(intentId)` を実行。これをもって決済確定・送金となる。
-        *   **DB:** `contracts.status` → `'completed'`. `contracts.completedAt` 更新。
-        *   **Notification:** ワーカーへ「検収完了・報酬確定」通知。
+    *   **Page:** `/client/contracts/[id]`
+    *   **UI:**
+        *   `DeliveryPreview`: ワーカーが納品したファイル/URLとコメントを表示。
+        *   `AcceptanceActions`:
+            *   `RejectButton`: 「修正依頼（差し戻し）」
+                *   クリックで理由入力モーダル表示 → 送信でステータスを `in_progress` へ戻す。
+            *   `ApproveButton`: **「検収完了（支払い確定）」ボタン**。
+                *   クリックで確認モーダル表示：「検収を完了しますか？これによりワーカーへの支払いが確定します。」
+                *   「確定する」ボタン押下で `/api/contracts/complete` をコール。
+    *   **System:** `/api/contracts/complete` (または `/api/stripe/capture-payment-intent`)。
+        *   ※現状のコードベースでは `capture-payment-intent` が実装されているが、業務フロー的には `contracts/complete` が適切。
 9.  **評価 (Both)**
-    *   **UI:** 相互評価モーダル (Star Rating 1-5 + Comment)。
-    *   **DB:** `users` の `rating` (平均点) と `reviewCount` を再計算して更新。
+    *   **Page:** `/client/contracts/[id]` / `/worker/contracts/[id]`
+    *   **UI:**
+        *   `ReviewModal`: 検収完了後に自動ポップアップ、または「評価を入力する」ボタンで表示。
+        *   Star Rating (1-5) とコメント入力。
 
 ---
 
 ### 2.2 コンペ方式（Competition Format）
 「ロゴ作成」や「ネーミング」など、多数の案から選びたい場合。
+**特徴:** 募集開始時に「仮払い」を行い、採用決定時に「本払い」を行う。
 
 #### 状態遷移図
 ```mermaid
@@ -138,37 +255,55 @@ stateDiagram-v2
     Closed --> [*]: 納品・検収完了
 ```
 
-#### 詳細ステップ & ロジック
+#### 詳細ステップ & 画面UI仕様
 
-1.  **募集 & 先払い (Client)**
-    *   **Action:** 仕事作成時に「コンペ方式」を選択。
-    *   **Logic:** **公開前に仮払い(PaymentIntent作成)が必須。** これによりワーカーは安心して提案できる。
-    *   **DB:** 決済成功後、`jobs` 作成 (`status: 'open'`, `type: 'competition'`).
-2.  **提案 (Worker)**
-    *   **Action:** 作品画像などを添付して「提案する」。
-    *   **DB:** `proposals` 作成 (`status: 'pending'`). `attachments` にURL配列保存。
-    *   **UI:** 提案一覧はグリッド表示。
-3.  **選定 (Client)**
-    *   **Trigger:** 募集期限到来、またはクライアントが早期終了を選択。
-    *   **DB:** `jobs.status` → `'selecting'`.
-    *   **Action:** 提案一覧から採用作品を選択し「採用する」。
-    *   **DB:**
-        *   採用された `proposal.status` → `'adopted'`.
-        *   不採用の `proposal.status` → `'rejected'`.
-        *   `contracts` 自動作成 (`status: 'submitted'` - 納品待ち).
-4.  **納品 (Worker)**
-    *   **Context:** 提案時のデータは透かし入り等の確認用である場合が多いため、正式データを納品するフローを挟む。
-    *   **Action:** 採用ワーカーが正式データをアップロード。
-    *   **DB:** `contracts` に納品URL保存。
-5.  **検収 & 支払い (Client)**
-    *   **Action:** データ確認後「検収完了」。
-    *   **System:** PaymentIntentを `capture`。
-    *   **DB:** `contracts.status` → `'completed'`. `jobs.status` → `'closed'`.
+1.  **募集作成 (Client)**
+    *   **Page:** `/client/jobs/new`
+    *   **UI:**
+        *   `JobTypeSelector`: 「コンペ方式」を選択。
+        *   `JobForm`: タイトル、詳細、カテゴリ、**契約金額（予算）**を入力。
+        *   `ConfirmButton`: 「確認画面へ進む」ボタン。
+2.  **仮払い & 公開 (Client)**
+    *   **Page:** `/client/jobs/new/confirm` (または確認モーダル)
+    *   **UI:**
+        *   募集内容のプレビュー表示。
+        *   `PaymentSection`: 「支払い金額：¥〇〇,〇〇〇（税込）」の表示。
+        *   `PublishButton`: **「仮払いして募集を開始する」ボタン**。
+            *   **Action:** クリックで `PaymentModal` (Stripe Elements) が表示される。
+            *   **Stripe Flow:**
+                1.  カード情報入力 → 支払い実行。
+                2.  決済成功 (`PaymentIntent` 完了) をトリガーに、`jobs` データを `status: 'open'` で作成。
+    *   **System:** 即時決済。資金はプラットフォームが預かる。
+3.  **提案 (Worker)**
+    *   **Page:** `/worker/jobs/[id]`
+    *   **UI:**
+        *   `ProposalForm`: 作品画像アップロード、提案コメント。
+        *   `SubmitButton`: 「提案する」。
+4.  **選定 & 採用 (Client)**
+    *   **Page:** `/client/jobs/[id]`
+    *   **UI:**
+        *   `ProposalList`: 提案一覧。
+        *   `AdoptButton`: 特定の提案詳細画面で**「この提案を採用する」ボタン**。
+            *   確認モーダル：「この作品で確定しますか？（契約が作成され、納品フェーズへ移行します）」
+    *   **DB:** `contracts` 作成 (`status: 'submitted'` - 納品待ち)。
+5.  **納品 (Worker)**
+    *   **Page:** `/worker/contracts/[id]` (採用後に生成される契約詳細ページ)
+    *   **UI:**
+        *   `DeliveryForm`: 「正式な納品データ（高解像度・透かしなし）」をアップロード。
+        *   ※コンペの場合、提案時のデータで良ければスキップも可能だが、トラブル防止のため正式納品フローを挟む。
+6.  **検収 & 本払い (Client)**
+    *   **Page:** `/client/contracts/[id]`
+    *   **UI:**
+        *   `DeliveryCheck`: 正式データを確認。
+        *   `CompleteButton`: **「検収完了（報酬支払い）」ボタン**。
+    *   **System:** Stripe Transfer実行。採用されたワーカーへ送金される。
+    *   **Refund:** 募集期間終了後、採用枠が埋まらなかった場合やキャンセル時は、残額をクライアントへRefundする。
 
 ---
 
 ### 2.3 タスク方式（Task Format）
 「アンケート」や「データ入力」など、単純作業の大量発注。
+**特徴:** 募集開始時に「総額（単価×件数）」を仮払いし、作業承認ごとに「本払い」を行う。
 
 #### 状態遷移図
 ```mermaid
@@ -182,32 +317,383 @@ stateDiagram-v2
     Rejected --> [*]
 ```
 
-#### 詳細ステップ & ロジック
+#### 詳細ステップ & 画面UI仕様
 
-1.  **募集 & 先払い (Client)**
-    *   **Input:** 単価(円)、件数(人)、制限時間(分)、設問(JSON)。
-    *   **Calc:** `Total Budget = Unit Price * Quantity`.
-    *   **System:** 総額分を仮払い (`capture_method: 'manual'`).
-    *   **DB:** `jobs` 作成 (`status: 'open'`, `type: 'task'`, `task: { ... }`).
-2.  **作業実施 (Worker)**
-    *   **Action:** 「作業を開始する」ボタン押下。
-    *   **Logic:** **排他制御:** 同一ユーザーは同時に1つのタスクしか作業できない。
-    *   **DB:** `task_submissions` 作成 (`status: 'working'`, `startedAt: serverTimestamp()`).
-    *   **UI:** 画面上に残り時間のカウントダウンタイマーを表示。
-    *   **Action:** 設問に回答し「作業を完了する」。
-    *   **Validation:** `serverTimestamp` と `startedAt` の差分が `timeLimit` 以内かチェック。
-    *   **DB:** `task_submissions.status` → `'pending'`.
-3.  **承認 (Client)**
-    *   **UI:** `/client/jobs/[id]/tasks` で提出一覧を確認。
-    *   **Action:** 各提出に対し「承認」または「非承認」を選択。
-    *   **Logic:** 非承認時は理由入力必須。
-    *   **DB:** `task_submissions.status` 更新。
-4.  **完了 & 決済 (System)**
-    *   **Trigger:** 全件承認完了、または募集期限終了。
-    *   **Calc:** `Final Amount = Unit Price * Approved Count`.
+1.  **募集作成 (Client)**
+    *   **Page:** `/client/jobs/new`
+    *   **UI:**
+        *   `JobTypeSelector`: 「タスク方式」を選択。
+        *   `TaskBuilder`: 単価、件数、制限時間、設問フォームを作成。
+        *   `BudgetPreview`: 合計金額（単価×件数＋消費税）の自動計算表示。
+        *   `ConfirmButton`: 「確認画面へ進む」ボタン。
+2.  **仮払い & 公開 (Client)**
+    *   **Page:** `/client/jobs/new/confirm`
+    *   **UI:**
+        *   タスク内容と合計金額の確認。
+        *   `PublishButton`: **「仮払いして募集を開始する」ボタン**。
+            *   **Action:** クリックで `PaymentModal` (Stripe Elements) が表示される。
+            *   **Stripe Flow:**
+                1.  総額を決済 (`PaymentIntent`)。
+                2.  決済成功後、`jobs` を `status: 'open'` で作成。
+3.  **作業実施 (Worker)**
+    *   **Page:** `/worker/jobs/[id]`
+    *   **UI:**
+        *   `StartButton`: 「作業を開始する」ボタン。
+            *   クリックで作業画面へ遷移（`task_submissions` 作成、在庫確保）。
+        *   `TaskWorkspace`: 制限時間内に回答を入力し、「作業を完了して提出する」ボタン押下。
+4.  **承認 & 本払い (Client)**
+    *   **Page:** `/client/jobs/[id]` (タスク管理タブ)
+    *   **UI:**
+        *   `SubmissionList`: 提出された作業の一覧。
+        *   `ApproveButton`: 各行の**「承認」ボタン**。
+            *   **Action:** クリックすると即座にその作業分の報酬（単価）がワーカーへ支払われる。
+            *   **System:** `/api/tasks/approve` → Stripe Transfer実行（単価分のみ）。
+        *   `RejectButton`: 「非承認」ボタン（理由入力必須）。報酬は支払われない。
+5.  **完了 & 返金 (System)**
+    *   **Trigger:** 募集期間終了、または全件承認完了。
+    *   **System:** 未消化分の予算（非承認分や応募不足分）がある場合、クライアントへ `Refund` 処理を行う。
+
+---
+
+## 2.4 決済・仮払い詳細仕様 (Payment & Escrow Deep Dive)
+
+本プラットフォームの核となる決済システムは、**Stripe Connect (Separate Charges and Transfers)** モデルを採用する。
+これは、クライアントからの支払いを一度プラットフォームが受け取り（仮払い）、検収完了後にワーカーへ送金（本払い）する方式である。
+
+### 採用理由とメリット
+1.  **長期案件への対応:** 通常のオーソリ（`capture_method: manual`）は7日間で期限切れとなるため、数週間〜数ヶ月に及ぶプロジェクト方式には不向きである。一度決済を完了させプラットフォーム残高として保持することで、期間の制限なくエスクロー状態を維持できる。
+2.  **柔軟な送金先:** コンペやタスク方式では、仮払い時点でワーカー（送金先）が未定である。プラットフォーム預かりとすることで、後から決定したワーカーへ送金が可能となる。
+3.  **分割送金:** タスク方式のように、1つの仮払い（Charge）に対して複数のワーカーへ分割して送金（Transfer）することが可能。
+
+### 金額計算シミュレーション (Financial Calculation)
+
+**前提:**
+*   **契約金額 (Contract Price):** 税抜きの本体価格。
+*   **消費税 (Tax):** 10% (日本国内)。
+*   **システム手数料 (Platform Fee):** 契約金額(税抜)の **5%** + 消費税。
+
+| 項目 | 計算式 | 例: 10,000円の場合 | 備考 |
+| :--- | :--- | :--- | :--- |
+| **A. 契約金額 (税抜)** | User Input | **10,000 円** | |
+| **B. 消費税 (10%)** | `A * 0.10` | 1,000 円 | |
+| **C. クライアント支払総額** | `A + B` | **11,000 円** | **仮払い金額 (Charge Amount)** |
+| **D. システム手数料 (税抜)** | `A * 0.05` | 500 円 | プラットフォーム収益 |
+| **E. 手数料の消費税** | `D * 0.10` | 50 円 | |
+| **F. システム手数料 (税込)** | `D + E` | 550 円 | |
+| **G. ワーカー受取額** | `C - F` | **10,450 円** | **本払い金額 (Transfer Amount)** |
+
+**検証:**
+*   ワーカー視点: 10,000円(税抜)の仕事をして、11,000円(税込)を受け取る権利があるが、そこから手数料550円(税込)が引かれる。
+*   `11,000 - 550 = 10,450`。整合性は取れている。
+
+### Stripe API 実装詳細
+
+#### 1. 仮払い (Charge / PaymentIntent)
+クライアントが支払うフェーズ。
+
+*   **API:** `stripe.paymentIntents.create`
+*   **タイミング:**
+    *   **プロジェクト:** 契約締結後、クライアントが「仮払い」ボタンを押した時。
+    *   **コンペ/タスク:** 募集作成の最終確認画面で「公開」ボタンを押した時。
+*   **パラメータ:**
+    ```javascript
+    {
+      amount: 11000, // C. クライアント支払総額
+      currency: 'jpy',
+      payment_method_types: ['card'],
+      transfer_group: '{jobId}', // 重要: 案件IDでグルーピングし、後で紐付ける
+      metadata: {
+        jobId: '{jobId}',
+        contractId: '{contractId}', // プロジェクト方式の場合
+        type: 'escrow'
+      }
+    }
+    ```
+*   **UI挙動:**
+    *   `PaymentModal` (Stripe Elements) を表示。
+    *   決済成功時、DBのステータスを更新 (`waiting_for_escrow` -> `escrow` / `open`)。
+
+#### 2. 本払い (Transfer)
+ワーカーへ報酬を移動するフェーズ。
+
+*   **API:** `stripe.transfers.create`
+*   **タイミング:**
+    *   **プロジェクト:** クライアントが「検収完了」ボタンを押した時。
+    *   **コンペ:** クライアントが「採用」を確定し、納品確認を完了した時。
+    *   **タスク:** クライアントが作業を「承認」した時。
+*   **前提条件 (Pre-conditions):**
+    *   ワーカーの `stripeAccountId` が存在し、Onboarding (本人確認) が完了していること (`charges_enabled: true`)。
+    *   プラットフォームのStripe残高が十分にあること。
+*   **パラメータ:**
+    ```javascript
+    {
+      amount: 10450, // G. ワーカー受取額
+      currency: 'jpy',
+      destination: '{workerStripeAccountId}', // ワーカーのConnect Account ID
+      transfer_group: '{jobId}', // 仮払いと同じグループIDを指定
+      metadata: {
+        jobId: '{jobId}',
+        contractId: '{contractId}',
+        type: 'reward'
+      }
+    }
+    ```
+*   **UI挙動:**
+    *   処理中はローディングスピナーを表示（二重送信防止）。
+    *   完了後、トースト通知「支払いが完了しました」を表示し、画面をリロードまたはステータス更新。
+
+#### 3. 返金 (Refund)
+キャンセルや余剰予算の返還フェーズ。
+
+*   **API:** `stripe.refunds.create`
+*   **タイミング:**
+    *   **プロジェクト:** 契約キャンセル合意時。
+    *   **コンペ:** 募集期間終了後、採用なしの場合。
+    *   **タスク:** 募集終了後、未消化予算がある場合。
+*   **パラメータ:**
+    ```javascript
+    {
+      payment_intent: '{paymentIntentId}', // 仮払い時のID
+      amount: 5500, // 返金する金額（全額または一部）
+      metadata: {
+        jobId: '{jobId}',
+        reason: 'cancellation'
+      }
+    }
+    ```
+
+### エラーハンドリングとリカバリー
+
+1.  **決済失敗 (Card Error):**
+    *   **原因:** 限度額オーバー、有効期限切れ、不正利用検知など。
+    *   **UI:** Stripe Elementsが自動的にエラーメッセージを表示する。クライアントには別のカードでの試行を促す。
+    *   **System:** DBの状態は変更しない（仮払い待ちのまま）。
+
+2.  **送金失敗 (Transfer Error):**
+    *   **原因:** ワーカーのStripeアカウント制限、本人確認未完了、プラットフォーム残高不足。
+    *   **UI:** クライアントには「処理中にエラーが発生しました。運営にお問い合わせください」と表示。
     *   **System:**
-        *   `stripe.paymentIntents.capture(intentId, { amount_to_capture: Final Amount })`.
-        *   差額（非承認分や未消化分）は自動的にリリース（返金）される。
+        *   エラーログを記録（重要）。
+        *   DBステータスは `disputed` または `transfer_failed` に変更し、管理者が手動で再送金できる管理画面を用意する。
+        *   ワーカーへ「報酬受取口座の確認」を促すメールを自動送信。
+
+3.  **整合性担保 (Idempotency):**
+    *   Stripe API呼び出し時には `Idempotency-Key` (冪等キー) を付与し、ネットワークエラー等による二重決済・二重送金を確実に防ぐ。キーには `contractId` や `submissionId` を含める。
+
+### 各方式における詳細フローとステータス遷移
+
+#### A. プロジェクト方式（固定報酬）
+1.  **仮払い:** 契約 (`contracts`) ごとに `PaymentIntent` を作成。
+    *   Status: `waiting_for_escrow` -> `escrow`
+    *   **Guard:** 仮払い完了まで、ワーカー側の「納品する」ボタンは **Disabled (非活性)** とする。
+2.  **業務・納品:** ワーカーが納品。
+    *   Status: `escrow` -> `submitted`
+3.  **検収・本払い:** クライアントが検収。`Transfer` を実行。
+    *   Status: `submitted` -> `completed`
+    *   **Guard:** 検収完了後、クライアントは返金を要求できない（Stripe上もRefund不可とする）。
+4.  **キャンセル:**
+    *   **業務開始前:** 全額返金 (`Refund`)。
+    *   **業務途中:** 話し合いにより決定した金額をワーカーへ `Transfer` し、残額をクライアントへ `Refund`。
+    *   Status: `*` -> `cancelled`
+    *   **Guard:** ワーカーが「納品済み」の場合、クライアント単独でのキャンセルは不可（ワーカーの合意アクションが必要）。
+
+#### B. コンペ方式
+1.  **仮払い:** 募集 (`jobs`) 作成時に予算全額を `PaymentIntent` で決済。
+    *   Status: `draft` -> `open`
+2.  **選定:** 募集終了後、採用作品を決定。
+    *   Status: `open` -> `selecting`
+3.  **採用・納品:** 採用ワーカーと契約作成。納品データを提出。
+    *   Contract Status: `waiting_for_delivery` -> `submitted`
+    *   **Guard:** 採用決定ボタン押下時、確認モーダルで「採用により契約が成立し、支払い義務が発生します」と明示。
+4.  **検収・本払い:** 納品データ確認後、採用ワーカーへ `Transfer`。
+    *   Contract Status: `submitted` -> `completed`
+    *   Job Status: `selecting` -> `closed`
+5.  **返金:**
+    *   募集終了時、`仮払い額 - 送金済み総額` を計算し、残額があれば自動的に `Refund` 処理を行うバッチを実行。
+
+#### C. タスク方式
+1.  **仮払い:** 募集 (`jobs`) 作成時に `単価 × 件数` の総額を `PaymentIntent` で決済。
+    *   Status: `draft` -> `open`
+2.  **作業:** ワーカーが作業提出。
+    *   Submission Status: `working` -> `pending`
+    *   **Guard:** 同一ワーカーによる連続投稿制限（短時間の大量投稿はBotの可能性があるため、reCAPTCHA等で対策）。
+3.  **承認・本払い:**
+    *   クライアントが1件承認するごとに、その作業のワーカーへ `単価` 分を `Transfer`。
+    *   即時性が求められるため、承認ボタン押下時に同期的にAPIをコールする。
+    *   Submission Status: `pending` -> `approved`
+    *   **Guard:** 一度「承認」した作業は取り消し不可。
+4.  **返金:**
+    *   募集終了時、またはクライアントによる早期終了時、`仮払い額 - 承認済み総額` を計算し、残額を `Refund`。
+    *   Job Status: `open` -> `closed`
+
+---
+
+## 2.5 不正防止・トラブル対策 (Security & Anti-Fraud)
+
+ユーザー目線での「抜け道」やリスクを排除するためのシステム的対策。
+
+### 1. 直接取引（中抜き）の防止
+*   **リスク:** メッセージ機能で連絡先を交換し、手数料を回避して直接取引を行う。
+*   **対策:**
+    *   **NGワード検知:** メッセージ内で「メールアドレス」「電話番号」「LINE ID」「@」などのパターンを検知し、送信前に警告モーダルを表示。「外部連絡先の交換は規約違反です」と警告する。
+    *   **監視:** 検知されたメッセージは管理画面でフラグを立て、運営が目視確認できるようにする。
+
+### 2. 仮払い前の業務強要（持ち逃げ）防止
+*   **リスク:** クライアントが「後で払うから」と作業をさせ、納品物だけ受け取って支払わない。
+*   **対策:**
+    *   **システム制御:** ステータスが `escrow` (仮払い済み) になるまで、ワーカー側の画面には「納品フォーム」を表示しない（または非活性化）。
+    *   **UI警告:** チャット画面や契約詳細画面に「仮払いが完了するまで、絶対に業務を開始しないでください」という警告帯を常時表示する。
+
+### 3. 納品データの持ち逃げ防止
+*   **リスク:** クライアントが納品ファイルをダウンロードした後、不当に検収を拒否・キャンセルする。
+*   **対策:**
+    *   **キャンセル制限:** ステータスが `submitted` (納品済み) の場合、クライアント側からのキャンセルボタンを非表示にする。キャンセルするには「トラブル報告」を行い、ワーカーの合意または運営の介入を必須とする。
+    *   **透かし (Watermark):** コンペの提案段階などの画像には、自動的に「SAMPLE」等の透かしを入れる処理を検討（将来実装）。
+
+### 4. タスク方式の不当な非承認
+*   **リスク:** 成果物を利用しつつ「非承認」にして報酬を支払わない。
+*   **対策:**
+    *   **理由必須:** 非承認にする際は、必ず理由を選択または入力させる。
+    *   **非承認率の可視化:** クライアントのプロフィールに「タスク承認率」を表示し、ワーカーがブラックなクライアントを避けられるようにする。
+
+### 5. マネーロンダリング・自作自演対策
+*   **リスク:** 不正な資金移動や、評価の水増し。
+*   **対策:**
+    *   **本人確認:** 報酬を受け取るワーカーだけでなく、高額発注を行うクライアントにもStripe Identityによる本人確認を求める場合がある。
+    *   **同一性チェック:** 発注者と受注者のIPアドレスやデバイス指紋が一致する場合、警告または取引ブロックを行う。
+
+---
+
+## 2.6 メッセージ機能詳細 (Messaging System Deep Dive)
+
+### 1. 基本仕様
+*   **形式:** 1対1のチャットルーム形式（案件ごとのルーム、またはユーザー間のダイレクトメッセージ）。
+*   **リアルタイム性:** Firestoreの `onSnapshot` を利用したリアルタイム更新。
+
+### 2. 既読管理 (Read Status)
+*   **ロジック:**
+    *   メッセージドキュメントに `readBy: string[]` フィールドを持たせる。
+    *   受信者がチャットルームを開いた（`useEffect` で検知）時点で、未読メッセージの `readBy` に自身のIDを追加する更新を行う。
+    *   送信者側には、相手が既読にしたメッセージに対して「既読」マークを表示する。
+
+### 3. ファイル添付 (File Attachment)
+*   **制限:**
+    *   サイズ: 1ファイルあたり最大 **100MB**。
+    *   形式: 画像(jpg, png, gif), ドキュメント(pdf, doc, docx, xls, xlsx, ppt, pptx), 圧縮ファイル(zip, rar)。
+    *   実行ファイル(exe, bat等)はセキュリティリスクのため禁止。
+*   **保存先:** Firebase Storage (`/messages/{roomId}/{fileId}`).
+*   **UI:** ドラッグ＆ドロップ対応。アップロード中はプログレスバーを表示。
+
+### 4. システムメッセージ (System Messages)
+*   **定義:** ユーザーが入力したテキストではなく、システムが自動投稿する通知メッセージ。
+*   **トリガー:**
+    *   契約締結時：「契約が締結されました。仮払いをお待ちください。」
+    *   仮払い完了時：「仮払いが完了しました。業務を開始してください。」
+    *   納品時：「ワーカーから納品報告がありました。検収を行ってください。」
+    *   検収完了時：「検収が完了しました。お疲れ様でした。」
+*   **表示:** 通常のメッセージとは異なるスタイル（背景色変更、中央寄せ等）で表示し、区別する。
+
+### 5. 通知連携
+*   **メール通知:** メッセージ受信から **5分間** 既読にならなかった場合、受信者の登録メールアドレスへ「新着メッセージのお知らせ」を送信する（即時送信だとチャット中に大量のメールが届くため、デバウンス処理を入れる）。
+
+---
+
+## 2.7 評価システム詳細 (Rating System Deep Dive)
+
+### 1. 評価項目 (Criteria)
+5段階評価（1: 悪い 〜 5: 非常に良い）。
+
+| 項目 | 対象 | 説明 |
+| :--- | :--- | :--- |
+| **品質 (Quality)** | Worker | 納品物のクオリティ、要件満たし度。 |
+| **納期 (Schedule)** | Worker | スケジュール遵守、レスポンス速度。 |
+| **コミュニケーション (Communication)** | Both | やり取りの円滑さ、丁寧さ。 |
+| **パートナーシップ (Partnership)** | Client | 要件の明確さ、支払いのスムーズさ。 |
+
+### 2. 総合評価の計算ロジック
+*   **計算式:** `(各項目の平均点) の平均` を算出。
+    *   例: 品質4, 納期5, コミュニケーション5 => (4+5+5)/3 = 4.66... -> **4.7**
+*   **ユーザー全体の評価:** 直近100件（または全期間）の取引における総合評価の平均値。
+*   **表示:** 小数点第1位まで表示（例: ★4.5）。
+
+### 3. 評価の公開タイミング (Double-Blind System)
+*   **相互評価方式:**
+    *   片方が評価を入力しても、相手にはまだ内容は公開されない（「評価済み」ステータスのみ伝わる）。
+    *   **双方が評価を入力した時点**、または **評価期限（検収から1ヶ月後）が過ぎた時点** で、両者の評価がプロフィールに公開される。
+    *   これにより、報復評価（低い評価を付けられたから低く付け返す行為）を防ぐ。
+
+### 4. 評価の修正
+*   **原則不可:** 一度確定した評価は修正できない。
+*   **例外:** 誹謗中傷や個人情報が含まれる場合など、運営が不適切と判断した場合のみ削除・修正を行う。
+
+---
+
+## 2.8 キャンセルポリシー詳細 (Cancellation Policy Deep Dive)
+
+### 1. フェーズ別キャンセル規定
+
+| フェーズ | キャンセル可否 | 手数料・返金 | 備考 |
+| :--- | :--- | :--- | :--- |
+| **契約前** | 自由 | 発生しない | 応募辞退、募集取り下げは自由。 |
+| **契約後・仮払い前** | 可能 | 発生しない | 相手へのメッセージ通知必須。自動キャンセル機能あり（1週間放置等）。 |
+| **仮払い後・業務開始前** | 可能 | **全額返金** | クライアント・ワーカー双方の合意が必要。システム手数料も返還される（Stripe仕様に準拠）。 |
+| **業務開始後・納品前** | 条件付き可能 | **部分返金** | 進捗に応じた金額をワーカーへ支払い、残額を返金。**システム手数料は「支払い額」に対してのみ発生**。 |
+| **納品後・検収前** | **原則不可** | - | 成果物が完成しているため、一方的なキャンセルは不可。品質に問題がある場合は「修正依頼」を行う。どうしても合意に至らない場合は運営介入。 |
+| **検収完了後** | **不可** | - | 決済確定後のキャンセル・返金はシステム上行わない。当事者間で解決する。 |
+
+### 2. 連絡不通時の自動処理 (Auto-Cancellation)
+*   **ワーカー連絡不通:** 業務期間中にワーカーからの連絡が **7日間** 途絶え、クライアントから「連絡不通申請」があった場合、運営が確認のうえ契約を途中終了（キャンセル）し、全額返金とする。
+*   **クライアント連絡不通:** 納品後、クライアントからの検収・連絡が **14日間** 途絶えた場合、**自動検収** とみなし、ワーカーへ報酬を支払う。
+
+---
+
+## 2.9 管理画面機能要件 (Admin Dashboard Requirements)
+
+運営者がプラットフォームを健全に保つための管理機能。`/admin/*` 配下に配置し、特定の管理者権限を持つユーザーのみアクセス可能とする。
+
+### 1. ユーザー管理 (User Management)
+*   **一覧・検索:** UID、メールアドレス、氏名、ステータスで検索可能。
+*   **詳細確認:** 登録情報、本人確認書類（Stripe Identity連携）、Stripe Connect ID、評価、取引履歴の閲覧。
+*   **アクション:**
+    *   **アカウント凍結/解除:** 規約違反ユーザーのログイン停止。
+    *   **強制退会:** アカウント削除。
+    *   **本人確認手動承認:** Stripe Identityで判定不能だった場合の目視確認・承認/否認。
+
+### 2. 案件・契約管理 (Job & Contract Management)
+*   **案件監視:** 新規投稿された案件の一覧。不適切な案件（公序良俗違反、マルチ商法等）の**非公開化・削除**。
+*   **契約介入:** トラブル発生中の契約詳細確認。メッセージログの閲覧。
+*   **強制キャンセル・返金:** 当事者間で解決しない場合、管理権限で契約をキャンセルし、Stripe APIを通じて**強制返金 (Refund)** または **強制送金 (Transfer)** を実行する。
+
+### 3. 通報管理 (Report Management)
+*   **通報一覧:** ユーザーから寄せられた通報（メッセージ、案件、プロフィール）の一覧。
+*   **対応ステータス:** `未対応` -> `確認中` -> `対応済み` / `却下` の管理。
+
+### 4. 売上・出金管理 (Financial Management)
+*   **売上集計:** 日次・月次の取扱高（GMV）、プラットフォーム収益（Net Revenue）のグラフ表示。
+*   **Stripe残高確認:** プラットフォーム口座の残高確認（送金資金不足のアラート）。
+
+---
+
+## 2.10 バッチ処理・自動化 (Scheduled Functions)
+
+Cloud Functions for Firebase (Pub/Sub Scheduler) を利用した定期実行処理。
+
+### 1. 募集期限切れチェック (Daily)
+*   **対象:** `status: 'open'` かつ `deadline < now` の案件。
+*   **処理:** ステータスを `closed` (募集終了) に更新し、クライアントへ通知メールを送信。
+*   **返金:** コンペ・タスク方式で仮払い済みの予算がある場合、自動的に `Refund` 処理を実行。
+
+### 2. 自動検収処理 (Daily)
+*   **対象:** `status: 'submitted'` (納品済み) かつ `submittedAt < 14 days ago` の契約。
+*   **処理:**
+    1.  クライアントへ最終警告メール送信（3日前など）。
+    2.  期限到来時、自動的に `status: 'completed'` に更新。
+    3.  Stripe `Transfer` APIを実行し、ワーカーへ報酬を支払う。
+    4.  システムメッセージ：「クライアントからの連絡がなかったため、規定により自動検収としました。」
+
+### 3. 未読メッセージ通知 (Every 15 mins)
+*   **対象:** `read: false` かつ `createdAt > 15 mins ago` のメッセージがあり、まだ通知メールを送っていないユーザー。
+*   **処理:** 「新着メッセージがあります」というメールを送信し、`emailSent: true` フラグを立てる（連続送信防止）。
 
 ---
 
@@ -261,7 +747,7 @@ CrowdWorksのマイページ構成をベースに、本プラットフォーム�
 | **氏名 (カナ)** | 必須 | String | 全角カタカナ。口座名義と一致すること。 |
 | **生年月日** | 必須 | Date | **登録後変更不可**。未成年チェックに使用。 |
 | **性別** | 任意 | Enum | 男性/女性/その他/無回答 |
-| **郵便番号** | 必須 | String | 7桁 (ハイフンなし可)。入力時に住所自動補完。 |
+| **郵便番号** | 必須 | String | 7桁 (ハイフンなし可)。**zipcloud API** を利用して住所自動補完を行う。 |
 | **都道府県** | 必須 | Select | 47都道府県。 |
 | **市区町村・番地** | 必須 | String | |
 | **建物名・部屋番号** | 任意 | String | |
@@ -283,15 +769,23 @@ CrowdWorksのマイページ構成をベースに、本プラットフォーム�
 **目的:** 信頼性担保。Stripe Identityを利用して本人確認を行う。
 **仕様:** **Stripe Identity**を利用した自動本人確認フローを採用する。
 
+*   **API:** `/api/identity/create-verification-session`
 *   **ステータス:**
     *   `unsubmitted`: 未提出
     *   `pending`: 審査中 (Stripeにて処理中)
     *   `approved`: 承認済み (バッジ付与)
     *   `rejected`: 否認 (再提出が必要)
-*   **UI:**
-    *   「本人確認を行う」ボタン (Stripe Identityの検証フローへリダイレクト)
-    *   結果表示 (承認/否認/審査中)
-    *   ※否認時はStripeからの理由を表示する。
+*   **UIフロー:**
+    1.  「本人確認を開始する」ボタンをクリック。
+    2.  APIをコールし、Stripe Verification Sessionを作成。
+    3.  返却されたURLへリダイレクト（またはリンク表示）。
+    4.  ユーザーがStripe上で書類（免許証、マイナンバーカード等）とセルフィーを提出。
+    5.  完了後、元のページへ戻る。
+    6.  StripeからのWebhook (`identity.verification_session.verified` 等) を受けてステータスを更新。
+*   **表示:**
+    *   審査中: 「現在、提出された書類を確認しています。」
+    *   承認済み: 「本人確認済み」バッジ表示。
+    *   否認: 理由（`verificationRejectionReason`）を表示し、再提出を促す。
 
 #### (4) 報酬振込先 (`/account/worker/payout`)
 **仕様:** Stripe Connect (Express) を使用するため、直接口座情報は保持しない。

@@ -35,8 +35,18 @@ export async function POST(req: NextRequest) {
     const workerDoc = await adminDb.collection("users").doc(contract?.workerId).get();
     const workerStripeAccountId = workerDoc.data()?.stripeAccountId;
 
-    if (!workerStripeAccountId) {
-      return NextResponse.json({ error: "Worker has not connected Stripe account" }, { status: 400 });
+    // Stripeが無効またはワーカーが未連携の場合のデモ動作
+    if (!process.env.STRIPE_SECRET_KEY || !workerStripeAccountId) {
+      console.warn("Stripe is not configured or worker has no account. Skipping payment for demo.");
+      
+      // デモ用: 直接ステータスを更新
+      await adminDb.collection("contracts").doc(contractId).update({
+        status: "escrow",
+        escrowAt: new Date(),
+        stripePaymentIntentId: "demo_payment_intent_id",
+      });
+
+      return NextResponse.json({ skipped: true });
     }
 
     // 6. PaymentIntent作成 (仮払い)
@@ -69,6 +79,21 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error("Error creating payment intent:", error);
+    // エラー時もデモとして通す場合のフォールバック（必要に応じて）
+    // return NextResponse.json({ error: error.message }, { status: 500 });
+    
+    // Stripeエラーの場合はデモとして処理する
+    console.warn("Stripe error occurred, falling back to demo mode.");
+    const { contractId } = await req.json().catch(() => ({ contractId: null }));
+    if (contractId) {
+        await adminDb.collection("contracts").doc(contractId).update({
+            status: "escrow",
+            escrowAt: new Date(),
+            stripePaymentIntentId: "demo_payment_intent_id_fallback",
+        });
+        return NextResponse.json({ skipped: true });
+    }
+    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

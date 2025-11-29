@@ -3,13 +3,14 @@
 import { useParams } from "next/navigation";
 import { ChatBox } from "@/components/features/message/ChatBox";
 import { Card } from "@/components/ui/Card";
+import { useAuth } from "@/components/providers/AuthProvider";
 
 export default function MessageRoomPage() {
   const params = useParams();
   const roomId = params.roomId as string;
+  const { user } = useAuth();
   
-  // TODO: Get current user ID from auth context
-  const currentUserId = "dummy-user-id";
+  if (!user) return <div className="p-8 text-center">ログインしてください</div>;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -37,7 +38,7 @@ export default function MessageRoomPage() {
             <p className="text-sm text-gray-500">案件: Reactを使用したWebサイト制作</p>
           </div>
           
-          <ChatBox roomId={roomId} currentUserId={currentUserId} />
+          <ChatBox roomId={roomId} currentUserId={user.uid} />
         </div>
       </div>
     </div>
