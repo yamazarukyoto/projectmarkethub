@@ -18,6 +18,18 @@ export default function AdminDashboard() {
             <p className="text-gray-600">契約一覧確認、トラブル対応など</p>
           </Card>
         </Link>
+        <Link href="/admin/reports">
+          <Card className="p-6 hover:shadow-md transition-shadow cursor-pointer">
+            <h2 className="text-xl font-semibold mb-2">通報管理</h2>
+            <p className="text-gray-600">ユーザーからの通報一覧、対応状況管理</p>
+          </Card>
+        </Link>
+        <Link href="/admin/financials">
+          <Card className="p-6 hover:shadow-md transition-shadow cursor-pointer">
+            <h2 className="text-xl font-semibold mb-2">売上・出金管理</h2>
+            <p className="text-gray-600">売上集計、Stripe残高確認など</p>
+          </Card>
+        </Link>
       </div>
     </div>
   );
