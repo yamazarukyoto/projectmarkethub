@@ -15,3 +15,13 @@ steps:
     ]
 images:
   - 'asia-northeast1-docker.pkg.dev/projectmarkethub/projectmarkethub-repo/app:latest'
+
+substitutions:
+  _NEXT_PUBLIC_FIREBASE_API_KEY: 'AIzaSyD6uAWaLZ6hHgYZpvRrcCKGOZRGWi3ruNU'
+  _NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: 'projectmarkethub-db904.firebaseapp.com'
+  _NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'projectmarkethub-db904'
+  _NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: 'projectmarkethub-db904.firebasestorage.app'
+  _NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '173689610587'
+  _NEXT_PUBLIC_FIREBASE_APP_ID: '1:173689610587:web:ea5e28f0e2e65e6cb43a7e'
+  _NEXT_PUBLIC_BASE_URL: 'https://project-market-hub.com'
+  _NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'pk_test_51SM2rh7B9svSOs6YITRyUCJdQU5a5qsrM3nEUPEwztdOfDhZRdCzLjvBlPmGoIGChCSow2BRLn0dxYIAp9lMRyas00ZFzygsZq'

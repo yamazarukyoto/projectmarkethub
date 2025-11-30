@@ -7,9 +7,10 @@ import { updateContractStatus } from "@/lib/db";
 import { Contract } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { ArrowLeft, CheckCircle, Clock, FileText, CreditCard } from "lucide-react";
+import { ArrowLeft, CheckCircle, Clock, FileText, CreditCard, MessageSquare } from "lucide-react";
 import { doc, getDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
+import Link from "next/link";
 import { PaymentModal } from "@/components/features/contract/PaymentModal";
 import { ReviewModal } from "@/components/features/contract/ReviewModal";
 import { updateUserRating } from "@/lib/db";
@@ -129,16 +130,26 @@ export default function ClientContractDetailPage() {
 
     return (
         <div className="container mx-auto px-4 py-8">
-            <Button variant="ghost" className="mb-4 pl-0" onClick={() => router.back()}>
-                <ArrowLeft size={20} className="mr-2" />
-                戻る
-            </Button>
+            <div className="flex justify-between items-center mb-4">
+                <Button variant="ghost" className="pl-0" onClick={() => router.back()}>
+                    <ArrowLeft size={20} className="mr-2" />
+                    戻る
+                </Button>
+                {contract.proposalId && (
+                    <Link href={`/messages/${contract.proposalId}`}>
+                        <Button variant="outline">
+                            <MessageSquare size={16} className="mr-2" />
+                            メッセージ
+                        </Button>
+                    </Link>
+                )}
+            </div>
 
             <Card>
                 <CardHeader>
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                         <CardTitle className="text-2xl font-bold text-secondary">契約詳細</CardTitle>
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${contract.status === 'completed' ? 'bg-green-100 text-green-800' :
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${contract.status === 'completed' ? 'bg-green-100 text-green-800' :
                                 contract.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
                                     'bg-yellow-100 text-yellow-800'
                             }`}>
@@ -166,9 +177,20 @@ export default function ClientContractDetailPage() {
                             <h3 className="text-sm font-semibold text-gray-500 mb-1">
                                 契約金額
                             </h3>
-                            <p className="text-lg font-medium">
-                                {contract.amount.toLocaleString()}円
-                            </p>
+                            <div className="text-sm">
+                                <div className="flex justify-between gap-4">
+                                    <span>契約金額 (税抜):</span>
+                                    <span>{contract.amount.toLocaleString()}円</span>
+                                </div>
+                                <div className="flex justify-between gap-4">
+                                    <span>消費税 (10%):</span>
+                                    <span>{contract.tax.toLocaleString()}円</span>
+                                </div>
+                                <div className="flex justify-between gap-4 font-bold border-t pt-1 mt-1">
+                                    <span>支払総額 (税込):</span>
+                                    <span>{contract.totalAmount.toLocaleString()}円</span>
+                                </div>
+                            </div>
                         </div>
                         <div>
                             <h3 className="text-sm font-semibold text-gray-500 mb-1">契約日</h3>
@@ -206,15 +228,30 @@ export default function ClientContractDetailPage() {
                         </div>
                     )}
 
-                    {contract.status === 'submitted' && (
+                    {(contract.status === 'submitted' || contract.status === 'completed') && (
                         <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-                            <h4 className="font-bold text-blue-900 mb-2">納品物が提出されました</h4>
-                            <p className="text-sm text-blue-800 mb-4">
-                                ワーカーから納品報告がありました。内容を確認し、問題なければ検収を完了してください。
-                            </p>
-                            <Button onClick={handleCapture} disabled={isProcessing}>
-                                検収完了（支払いを確定）
-                            </Button>
+                            <h4 className="font-bold text-blue-900 mb-2">納品物</h4>
+                            <div className="space-y-2 text-sm text-blue-800 mb-4 bg-white p-3 rounded border border-blue-200">
+                                <p><strong>成果物URL:</strong> <a href={contract.deliveryFileUrl} target="_blank" rel="noopener noreferrer" className="underline text-primary">{contract.deliveryFileUrl}</a></p>
+                                <div className="mt-2">
+                                    <strong>メッセージ:</strong>
+                                    <p className="whitespace-pre-wrap mt-1">{contract.deliveryMessage}</p>
+                                </div>
+                            </div>
+                            
+                            {contract.status === 'submitted' && (
+                                <div>
+                                    <p className="text-sm text-blue-800 mb-4">
+                                        内容を確認し、問題なければ検収を完了してください。
+                                    </p>
+                                    <div className="flex gap-4">
+                                        <Button onClick={handleCapture} disabled={isProcessing}>
+                                            検収完了（支払いを確定）
+                                        </Button>
+                                        {/* Future: Add Reject Button */}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </CardContent>

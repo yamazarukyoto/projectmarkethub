@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/components/providers/AuthProvider";
+import { updateUser } from "@/lib/db";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
 
 export default function WorkerProfilePage() {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     displayName: "",
@@ -15,16 +18,38 @@ export default function WorkerProfilePage() {
     hoursPerWeek: "10-20時間",
   });
 
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        displayName: user.displayName || "",
+        title: user.workerProfile?.title || "",
+        bio: user.workerProfile?.bio || "",
+        skills: user.workerProfile?.skills?.join(", ") || "",
+        hoursPerWeek: user.workerProfile?.hoursPerWeek || "10-20時間",
+      });
+    }
+  }, [user]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
+
     setLoading(true);
     try {
-      // TODO: Implement update logic
-      console.log("Update worker profile", formData);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await updateUser(user.uid, {
+        displayName: formData.displayName,
+        workerProfile: {
+          title: formData.title,
+          bio: formData.bio,
+          skills: formData.skills.split(",").map(s => s.trim()).filter(s => s),
+          hoursPerWeek: formData.hoursPerWeek,
+        },
+        updatedAt: new Date() as any,
+      });
       alert("保存しました");
     } catch (error) {
       console.error(error);
+      alert("保存に失敗しました");
     } finally {
       setLoading(false);
     }

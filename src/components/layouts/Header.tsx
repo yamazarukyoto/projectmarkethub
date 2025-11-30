@@ -8,6 +8,8 @@ import { auth } from "@/lib/firebase";
 import { useMode } from "@/components/providers/ModeProvider";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { Button } from "@/components/ui/Button";
+import { getNotifications, markAsRead } from "@/lib/db";
+import { Notification } from "@/types";
 import {
     Briefcase,
     Search,
@@ -28,14 +30,21 @@ export const Header = () => {
     const router = useRouter();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+    const [notifications, setNotifications] = useState<Notification[]>([]);
     const profileMenuRef = useRef<HTMLDivElement>(null);
+    const notificationMenuRef = useRef<HTMLDivElement>(null);
 
     const isClient = mode === "client";
+    const currentUser = user || firebaseUser;
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
                 setIsProfileOpen(false);
+            }
+            if (notificationMenuRef.current && !notificationMenuRef.current.contains(event.target as Node)) {
+                setIsNotificationsOpen(false);
             }
         };
 
@@ -44,6 +53,36 @@ export const Header = () => {
             document.removeEventListener("mousedown", handleClickOutside);
         };
     }, []);
+
+    useEffect(() => {
+        const fetchNotifications = async () => {
+            if (currentUser) {
+                try {
+                    const data = await getNotifications(currentUser.uid);
+                    setNotifications(data);
+                } catch (error) {
+                    console.error("Error fetching notifications:", error);
+                }
+            }
+        };
+        fetchNotifications();
+        // Poll every minute
+        const interval = setInterval(fetchNotifications, 60000);
+        return () => clearInterval(interval);
+    }, [currentUser]);
+
+    const handleNotificationClick = async (notification: Notification) => {
+        if (!notification.read) {
+            await markAsRead(notification.id);
+            setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, read: true } : n));
+        }
+        setIsNotificationsOpen(false);
+        if (notification.link) {
+            router.push(notification.link);
+        }
+    };
+
+    const unreadCount = notifications.filter(n => !n.read).length;
 
     const handleModeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const newMode = e.target.value as "client" | "worker";
@@ -88,7 +127,6 @@ export const Header = () => {
     ];
 
     const links = isClient ? clientLinks : workerLinks;
-    const currentUser = user || firebaseUser;
 
     return (
         <header className={clsx("sticky top-0 z-50 bg-white shadow-sm border-t-4", borderColor)}>
@@ -107,7 +145,7 @@ export const Header = () => {
                                     key={link.href}
                                     href={link.href}
                                     className={clsx(
-                                        "text-sm font-medium transition-colors hover:text-primary",
+                                        "text-sm font-medium transition-colors hover:text-primary whitespace-nowrap",
                                         pathname === link.href ? "text-primary" : "text-gray-600"
                                     )}
                                 >
@@ -124,7 +162,7 @@ export const Header = () => {
                             <select
                                 value={mode}
                                 onChange={handleModeChange}
-                                className="text-sm border-gray-300 rounded-md focus:ring-primary focus:border-primary"
+                                className="text-sm border-gray-300 rounded-md focus:ring-primary focus:border-primary cursor-pointer"
                             >
                                 <option value="client">クライアントモード</option>
                                 <option value="worker">ワーカーモード</option>
@@ -137,12 +175,53 @@ export const Header = () => {
                             <>
                                 <button className="p-2 text-gray-500 hover:text-primary relative">
                                     <MessageSquare size={20} />
-                                    <span className="absolute top-1 right-1 w-2 h-2 bg-danger rounded-full"></span>
+                                    {/* <span className="absolute top-1 right-1 w-2 h-2 bg-danger rounded-full"></span> */}
                                 </button>
-                                <button className="p-2 text-gray-500 hover:text-primary relative">
-                                    <Bell size={20} />
-                                    <span className="absolute top-1 right-1 w-2 h-2 bg-danger rounded-full"></span>
-                                </button>
+                                
+                                {/* Notification Dropdown */}
+                                <div className="relative" ref={notificationMenuRef}>
+                                    <button 
+                                        className="p-2 text-gray-500 hover:text-primary relative"
+                                        onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                                    >
+                                        <Bell size={20} />
+                                        {unreadCount > 0 && (
+                                            <span className="absolute top-1 right-1 w-2 h-2 bg-danger rounded-full"></span>
+                                        )}
+                                    </button>
+
+                                    {isNotificationsOpen && (
+                                        <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg py-1 border border-gray-100 max-h-96 overflow-y-auto">
+                                            <div className="px-4 py-2 border-b border-gray-100">
+                                                <p className="text-sm font-medium text-gray-900">通知</p>
+                                            </div>
+                                            {notifications.length === 0 ? (
+                                                <div className="px-4 py-4 text-center text-sm text-gray-500">
+                                                    通知はありません
+                                                </div>
+                                            ) : (
+                                                notifications.map((notification) => (
+                                                    <button
+                                                        key={notification.id}
+                                                        onClick={() => handleNotificationClick(notification)}
+                                                        className={clsx(
+                                                            "w-full text-left px-4 py-3 text-sm hover:bg-gray-50 border-b border-gray-50 last:border-0",
+                                                            !notification.read && "bg-blue-50/50"
+                                                        )}
+                                                    >
+                                                        <p className={clsx("font-medium mb-1", !notification.read ? "text-primary" : "text-gray-900")}>
+                                                            {notification.title}
+                                                        </p>
+                                                        <p className="text-gray-600 text-xs line-clamp-2">{notification.body}</p>
+                                                        <p className="text-gray-400 text-[10px] mt-1">
+                                                            {notification.createdAt?.toDate ? notification.createdAt.toDate().toLocaleString() : ""}
+                                                        </p>
+                                                    </button>
+                                                ))
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
 
                                 {/* Profile Dropdown */}
                                 <div className="relative" ref={profileMenuRef}>
@@ -181,9 +260,13 @@ export const Header = () => {
                                         </div>
                                     )}
                                 </div>
+                                {/* Settings Link */}
+                                <Link href="/account/profile" className="p-2 text-gray-500 hover:text-primary">
+                                    <Settings size={20} />
+                                </Link>
                                 {/* Desktop Logout Button */}
                                 <div className="hidden md:block">
-                                    <Button variant="ghost" size="sm" onClick={handleLogout} className="text-danger hover:text-danger hover:bg-red-50">
+                                    <Button variant="ghost" size="sm" onClick={handleLogout} className="text-danger hover:text-danger hover:bg-red-50 whitespace-nowrap">
                                         ログアウト
                                     </Button>
                                 </div>
@@ -191,10 +274,10 @@ export const Header = () => {
                         ) : (
                             <div className="flex items-center gap-2">
                                 <Link href="/login">
-                                    <Button variant="ghost" size="sm">ログイン</Button>
+                                    <Button variant="ghost" size="sm" className="whitespace-nowrap">ログイン</Button>
                                 </Link>
                                 <Link href="/register">
-                                    <Button size="sm">会員登録</Button>
+                                    <Button size="sm" className="whitespace-nowrap">会員登録</Button>
                                 </Link>
                             </div>
                         )}

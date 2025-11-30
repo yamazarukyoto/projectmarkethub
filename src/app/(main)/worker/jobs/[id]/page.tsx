@@ -12,9 +12,11 @@ import { Job, Proposal } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { ArrowLeft, Clock, DollarSign, Calendar, Tag, CheckCircle, Paperclip, Download } from "lucide-react";
+import { ArrowLeft, Clock, DollarSign, Calendar, Tag, CheckCircle, Paperclip, Download, Upload, X, FileText } from "lucide-react";
 import { Timestamp } from "firebase/firestore";
 import { TaskWorkspace } from "@/components/features/task/TaskWorkspace";
+import { storage } from "@/lib/firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 const proposalSchema = z.object({
     price: z.number().min(1, "金額を入力してください"),
@@ -33,6 +35,7 @@ export default function WorkerJobDetailPage() {
     const [submitting, setSubmitting] = useState(false);
     const [hasApplied, setHasApplied] = useState(false);
     const [contractId, setContractId] = useState<string | null>(null);
+    const [files, setFiles] = useState<File[]>([]);
 
     const {
         register,
@@ -72,11 +75,30 @@ export default function WorkerJobDetailPage() {
         fetchData();
     }, [params.id, user]);
 
+    const uploadFiles = async (files: File[]): Promise<string[]> => {
+        const urls: string[] = [];
+        for (const file of files) {
+            const storageRef = ref(storage, `proposal-attachments/${Date.now()}_${file.name}`);
+            await uploadBytes(storageRef, file);
+            const url = await getDownloadURL(storageRef);
+            urls.push(url);
+        }
+        return urls;
+    };
+
     const onSubmit = async (data: ProposalFormValues) => {
         if (!user || !job) return;
+        
+        if (job.type === 'competition' && files.length === 0) {
+            alert("コンペ方式では提案ファイルの添付が必須です。");
+            return;
+        }
+
         setSubmitting(true);
         try {
-            await createProposal({
+            const attachmentUrls = await uploadFiles(files);
+
+            const proposalId = await createProposal({
                 jobId: job.id,
                 clientId: job.clientId,
                 workerId: user.uid,
@@ -88,17 +110,36 @@ export default function WorkerJobDetailPage() {
                 status: "pending",
                 createdAt: Timestamp.now(),
                 updatedAt: Timestamp.now(),
-                attachments: [],
+                attachments: attachmentUrls,
                 negotiationHistory: [],
             });
             setHasApplied(true);
-            alert("応募が完了しました！");
+            
+            if (job.type === 'competition') {
+                alert("提案を提出しました！");
+                // コンペの場合はメッセージルームではなく、応募管理画面へ戻るのが一般的かも
+                router.push("/worker/applications");
+            } else {
+                alert("応募が完了しました！メッセージルームへ移動します。");
+                router.push(`/messages/${proposalId}`);
+            }
         } catch (err) {
             console.error(err);
             alert("エラーが発生しました");
         } finally {
             setSubmitting(false);
         }
+    };
+
+    const onFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const newFiles = Array.from(e.target.files);
+            setFiles(prev => [...prev, ...newFiles]);
+        }
+    };
+
+    const removeFile = (index: number) => {
+        setFiles(prev => prev.filter((_, i) => i !== index));
     };
 
     const handleTaskSubmit = async (answers: any[]) => {
@@ -135,9 +176,9 @@ export default function WorkerJobDetailPage() {
                 <div className="lg:col-span-2 space-y-6">
                     <Card>
                         <CardHeader>
-                            <div className="flex justify-between items-start">
+                            <div className="flex flex-col md:flex-row justify-between items-start gap-4">
                                 <CardTitle className="text-2xl font-bold text-secondary">{job.title}</CardTitle>
-                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${job.status === 'open' ? 'bg-green-100 text-green-800' :
+                                <span className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${job.status === 'open' ? 'bg-green-100 text-green-800' :
                                     job.status === 'filled' ? 'bg-blue-100 text-blue-800' :
                                         'bg-gray-100 text-gray-800'
                                     }`}>
@@ -147,7 +188,7 @@ export default function WorkerJobDetailPage() {
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-6">
-                            <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+                            <div className="flex flex-col sm:flex-row flex-wrap gap-4 text-sm text-gray-600">
                                 <div className="flex items-center gap-1">
                                     <DollarSign size={16} />
                                     <span>予算: {job.budget?.toLocaleString()}円 (固定報酬)</span>
@@ -171,9 +212,9 @@ export default function WorkerJobDetailPage() {
                                 <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
                                     <Tag size={16} /> 関連タグ
                                 </h3>
-                                <div className="flex gap-2">
+                                <div className="flex flex-wrap gap-2">
                                     {Array.isArray(job.tags) && job.tags.map(tag => (
-                                        <span key={tag} className="px-2 py-1 bg-gray-100 text-xs rounded text-gray-600">
+                                        <span key={tag} className="px-2 py-1 bg-gray-100 text-xs rounded text-gray-600 whitespace-nowrap">
                                             {tag}
                                         </span>
                                     ))}
@@ -280,8 +321,52 @@ export default function WorkerJobDetailPage() {
                                             {errors.message && <p className="mt-1 text-sm text-danger">{errors.message.message}</p>}
                                         </div>
 
+                                        {/* File Upload for Competition or Optional for Project */}
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                {job.type === 'competition' ? '提案ファイル (必須)' : '添付ファイル (任意)'}
+                                            </label>
+                                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-primary transition-colors">
+                                                <input
+                                                    type="file"
+                                                    multiple
+                                                    className="hidden"
+                                                    id="proposal-file-upload"
+                                                    onChange={onFileSelect}
+                                                />
+                                                <label
+                                                    htmlFor="proposal-file-upload"
+                                                    className="cursor-pointer flex flex-col items-center justify-center gap-2"
+                                                >
+                                                    <Upload className="h-6 w-6 text-gray-400" />
+                                                    <span className="text-sm text-gray-600">
+                                                        ファイルを選択
+                                                    </span>
+                                                </label>
+                                            </div>
+                                            {files.length > 0 && (
+                                                <div className="mt-2 space-y-2">
+                                                    {files.map((file, index) => (
+                                                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                                                            <div className="flex items-center gap-2">
+                                                                <FileText className="h-4 w-4 text-gray-500" />
+                                                                <span className="text-sm text-gray-700 truncate max-w-[200px]">{file.name}</span>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => removeFile(index)}
+                                                                className="text-gray-400 hover:text-danger"
+                                                            >
+                                                                <X className="h-4 w-4" />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+
                                         <Button type="submit" className="w-full" disabled={submitting}>
-                                            {submitting ? "送信中..." : "応募する"}
+                                            {submitting ? "送信中..." : job.type === 'competition' ? "提案する" : "応募する"}
                                         </Button>
                                     </form>
                                 )}

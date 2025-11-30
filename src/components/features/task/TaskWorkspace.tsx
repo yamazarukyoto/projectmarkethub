@@ -4,22 +4,22 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Job } from "@/types";
+import { Job, TaskSubmission } from "@/types";
 
 interface TaskWorkspaceProps {
   job: Job;
-  onSubmit: (answers: any[]) => Promise<void>;
+  onSubmit: (answers: TaskSubmission["answers"]) => Promise<void>;
 }
 
 export function TaskWorkspace({ job, onSubmit }: TaskWorkspaceProps) {
-  const [answers, setAnswers] = useState<any[]>([]);
+  const [answers, setAnswers] = useState<TaskSubmission["answers"]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!job.task?.questions) return <div>設問がありません</div>;
 
-  const handleAnswerChange = (index: number, value: any) => {
+  const handleAnswerChange = (index: number, value: string | string[]) => {
     const newAnswers = [...answers];
-    newAnswers[index] = { questionId: index, value };
+    newAnswers[index] = { questionId: String(index), value };
     setAnswers(newAnswers);
   };
 
@@ -52,7 +52,7 @@ export function TaskWorkspace({ job, onSubmit }: TaskWorkspaceProps) {
               <label className="block font-medium text-gray-700">
                 Q{index + 1}. {q.text}
               </label>
-              
+
               {q.type === "text" && (
                 <textarea
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 h-24 focus:border-primary focus:ring-1 focus:ring-primary"
@@ -90,12 +90,13 @@ export function TaskWorkspace({ job, onSubmit }: TaskWorkspaceProps) {
                         id={`q-${index}-${optIndex}`}
                         value={option}
                         onChange={(e) => {
-                          const currentValues = answers[index]?.value || [];
+                          const currentValues = answers[index]?.value;
+                          const valuesArray = Array.isArray(currentValues) ? currentValues : [];
                           let newValues;
                           if (e.target.checked) {
-                            newValues = [...currentValues, option];
+                            newValues = [...valuesArray, option];
                           } else {
-                            newValues = currentValues.filter((v: string) => v !== option);
+                            newValues = valuesArray.filter((v: string) => v !== option);
                           }
                           handleAnswerChange(index, newValues);
                         }}

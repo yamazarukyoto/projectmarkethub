@@ -69,20 +69,15 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, paymentIntent });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error capturing payment intent:", error);
     
     // エラー時もデモとして通す場合のフォールバック
-    console.warn("Stripe capture error occurred, falling back to demo mode.");
-    const { contractId } = await req.json().catch(() => ({ contractId: null }));
-    if (contractId) {
-         await adminDb.collection("contracts").doc(contractId).update({
-            status: "completed",
-            completedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-        return NextResponse.json({ success: true, skipped: true });
-    }
-
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    // 注意: req.json() は一度しか読めないため、tryブロック内で取得した contractId を使用するべきだが、
+    // ここではスコープ外のため、本来は変数を外に出すべき。
+    // しかし、既存コードのロジックを尊重しつつ、安全に修正する。
+    
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

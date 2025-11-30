@@ -121,7 +121,7 @@ export interface Proposal {
     
     negotiationHistory: {
         senderId: string;
-        price: number;
+        price?: number;
         message: string;
         createdAt: Timestamp;
     }[];
@@ -133,6 +133,7 @@ export interface Proposal {
 export interface Contract {
     id: string;
     jobId: string;
+    proposalId?: string; // Added for linking back to chat
     clientId: string;
     workerId: string;
     

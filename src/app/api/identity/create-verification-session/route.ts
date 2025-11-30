@@ -71,20 +71,19 @@ export async function POST(req: Request) {
         console.log("Verification session created successfully:", verificationSession.id);
         console.log("Redirect URL:", verificationSession.url);
         return NextResponse.json({ url: verificationSession.url });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error creating verification session:", error);
         
+        const isStripeError = (err: any): err is { type: string; code: string; message: string } => {
+            return typeof err === 'object' && err !== null && 'type' in err;
+        };
+
         // Fallback to demo if Stripe fails
         console.warn("Stripe Identity failed, falling back to demo.");
-        // Need to get userId again if possible, but it's in scope
-        // However, we need to be careful about scope.
-        // We can just return error if we can't recover easily, or try to recover.
-        // Since userId is available in the scope of try block, we can use it if we move the fallback inside.
-        // But error handling is cleaner if we just check for Stripe key first.
         
         // If we are here, it means Stripe call failed.
         // Let's try to fallback if it was a Stripe error.
-        if (error.type || !process.env.STRIPE_SECRET_KEY) {
+        if ((isStripeError(error) && error.type) || !process.env.STRIPE_SECRET_KEY) {
              const authHeader = req.headers.get("Authorization");
              if (authHeader?.startsWith("Bearer ")) {
                  const token = authHeader.split("Bearer ")[1];
@@ -105,13 +104,15 @@ export async function POST(req: Request) {
         }
 
         // Log more details if it's a Stripe error
-        if (error.type) {
+        if (isStripeError(error)) {
             console.error("Stripe Error Type:", error.type);
             console.error("Stripe Error Code:", error.code);
             console.error("Stripe Error Message:", error.message);
         }
+        
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         return NextResponse.json(
-            { error: "Internal Server Error", details: error.message },
+            { error: "Internal Server Error", details: errorMessage },
             { status: 500 }
         );
     }

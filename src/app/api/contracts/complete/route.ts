@@ -107,21 +107,17 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, paymentIntent, transfer });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error completing contract:", error);
     
     // エラー時もデモとして通す場合のフォールバック
-    console.warn("Stripe complete error occurred, falling back to demo mode.");
-    const { contractId } = await req.json().catch(() => ({ contractId: null }));
-    if (contractId) {
-         await adminDb.collection("contracts").doc(contractId).update({
-            status: "completed",
-            completedAt: admin.firestore.FieldValue.serverTimestamp(),
-            stripeTransferId: "demo_transfer_id_fallback",
-        });
-        return NextResponse.json({ success: true, skipped: true });
-    }
+    // 注意: req.json() は一度しか読めないため、tryブロック内で取得した contractId を使用するべきだが、
+    // ここではスコープ外のため、本来は変数を外に出すべき。
+    // しかし、既存コードのロジックを尊重しつつ、安全に修正する。
+    
+    // エラーメッセージの取得
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
 
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

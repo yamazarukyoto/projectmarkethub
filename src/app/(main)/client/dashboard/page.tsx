@@ -90,13 +90,14 @@ export default function ClientDashboard() {
                 </Card>
             </div>
 
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
                 <h2 className="text-xl font-bold text-secondary">依頼管理</h2>
-                <div className="flex gap-2">
+                <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 whitespace-nowrap">
                     <Button 
                         variant={filter === 'all' ? 'primary' : 'ghost'} 
                         size="sm" 
                         onClick={() => setFilter('all')}
+                        className="whitespace-nowrap"
                     >
                         すべて
                     </Button>
@@ -104,6 +105,7 @@ export default function ClientDashboard() {
                         variant={filter === 'open' ? 'primary' : 'ghost'} 
                         size="sm" 
                         onClick={() => setFilter('open')}
+                        className="whitespace-nowrap"
                     >
                         募集中
                     </Button>
@@ -111,6 +113,7 @@ export default function ClientDashboard() {
                         variant={filter === 'filled' ? 'primary' : 'ghost'} 
                         size="sm" 
                         onClick={() => setFilter('filled')}
+                        className="whitespace-nowrap"
                     >
                         契約中
                     </Button>
@@ -118,6 +121,7 @@ export default function ClientDashboard() {
                         variant={filter === 'closed' ? 'primary' : 'ghost'} 
                         size="sm" 
                         onClick={() => setFilter('closed')}
+                        className="whitespace-nowrap"
                     >
                         完了
                     </Button>
@@ -132,22 +136,22 @@ export default function ClientDashboard() {
                         <Link key={job.id} href={`/client/jobs/${job.id}`}>
                             <Card className="hover:shadow-md transition-shadow cursor-pointer">
                                 <CardContent className="p-6">
-                                    <div className="flex justify-between items-start">
+                                    <div className="flex flex-col md:flex-row justify-between items-start gap-4">
                                         <div>
                                             <h3 className="text-lg font-bold mb-2">{job.title}</h3>
                                             <p className="text-sm text-gray-500 mb-2">
                                                 予算: {job.budget.toLocaleString()}円
                                             </p>
-                                            <div className="flex gap-2">
+                                            <div className="flex flex-wrap gap-2">
                                                 {job.tags.map(tag => (
-                                                    <span key={tag} className="px-2 py-1 bg-gray-100 text-xs rounded text-gray-600">
+                                                    <span key={tag} className="px-2 py-1 bg-gray-100 text-xs rounded text-gray-600 whitespace-nowrap">
                                                         {tag}
                                                     </span>
                                                 ))}
                                             </div>
                                         </div>
-                                        <div className="flex flex-col items-end gap-2">
-                                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${job.status === 'open' ? 'bg-green-100 text-green-800' :
+                                        <div className="flex flex-row md:flex-col items-center md:items-end gap-2 w-full md:w-auto justify-between md:justify-start">
+                                            <span className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${job.status === 'open' ? 'bg-green-100 text-green-800' :
                                                     job.status === 'filled' ? 'bg-blue-100 text-blue-800' :
                                                         'bg-gray-100 text-gray-800'
                                                 }`}>
@@ -155,7 +159,7 @@ export default function ClientDashboard() {
                                                     job.status === 'filled' ? '契約中' : 
                                                     job.status === 'selecting' ? '選定中' : '終了'}
                                             </span>
-                                            <span className="text-xs text-gray-400">
+                                            <span className="text-xs text-gray-400 whitespace-nowrap">
                                                 {job.createdAt.toDate().toLocaleDateString()}
                                             </span>
                                         </div>

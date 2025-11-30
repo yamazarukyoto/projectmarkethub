@@ -15,21 +15,23 @@ export default function Home() {
                     <div className="container mx-auto px-4 relative z-10">
                         <div className="max-w-3xl mx-auto text-center">
                             <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
-                                未来を創る<br />
-                                <span className="text-primary">プロフェッショナル</span>と出会う
+                                <span className="inline-block">未来を創る</span>
+                                <br className="hidden md:block" />
+                                <span className="text-primary inline-block">プロフェッショナル</span>
+                                <span className="inline-block">と出会う</span>
                             </h1>
                             <p className="text-lg md:text-xl text-gray-200 mb-8">
                                 Project Market Hubは、信頼できるクライアントとスキルを持ったワーカーを繋ぐ、
                                 次世代のクラウドソーシングプラットフォームです。
                             </p>
                             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                                <Link href="/register">
-                                    <Button size="lg" className="w-full sm:w-auto text-lg px-8">
+                                <Link href="/register" className="w-full sm:w-auto">
+                                    <Button size="lg" className="w-full text-lg px-8 whitespace-nowrap">
                                         無料で始める <ArrowRight className="ml-2" size={20} />
                                     </Button>
                                 </Link>
-                                <Link href="/worker/search">
-                                    <Button variant="outline" size="lg" className="w-full sm:w-auto text-lg px-8 border-white text-white hover:bg-white/10 hover:text-white">
+                                <Link href="/worker/search" className="w-full sm:w-auto">
+                                    <Button variant="outline" size="lg" className="w-full text-lg px-8 border-white text-white hover:bg-white/10 hover:text-white whitespace-nowrap">
                                         仕事を探す
                                     </Button>
                                 </Link>
@@ -89,7 +91,7 @@ export default function Home() {
                                     まずは無料で会員登録から始めましょう。
                                 </p>
                                 <Link href="/register">
-                                    <Button size="lg" className="bg-accent hover:bg-accent/90 text-white border-none">
+                                    <Button size="lg" className="bg-accent hover:bg-accent/90 text-white border-none whitespace-nowrap">
                                         今すぐ会員登録する
                                     </Button>
                                 </Link>

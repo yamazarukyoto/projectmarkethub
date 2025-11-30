@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/components/providers/AuthProvider";
+import { updateUser } from "@/lib/db";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
 
 export default function ProfilePage() {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -16,6 +19,20 @@ export default function ProfilePage() {
     building: "",
     phoneNumber: "",
   });
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        name: user.name || "",
+        nameKana: user.nameKana || "",
+        postalCode: user.address?.postalCode || "",
+        prefecture: user.address?.prefecture || "",
+        city: user.address?.city || "",
+        building: user.address?.building || "",
+        phoneNumber: user.phoneNumber || "",
+      });
+    }
+  }, [user]);
 
   const PREFECTURES = [
     "北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県",
@@ -54,14 +71,26 @@ export default function ProfilePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
+    
     setLoading(true);
     try {
-      // TODO: Implement update logic
-      console.log("Update profile", formData);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await updateUser(user.uid, {
+        name: formData.name,
+        nameKana: formData.nameKana,
+        phoneNumber: formData.phoneNumber,
+        address: {
+          postalCode: formData.postalCode,
+          prefecture: formData.prefecture,
+          city: formData.city,
+          building: formData.building,
+        },
+        updatedAt: new Date() as any, // Timestamp conversion handled by Firestore or need import
+      });
       alert("保存しました");
     } catch (error) {
       console.error(error);
+      alert("保存に失敗しました");
     } finally {
       setLoading(false);
     }

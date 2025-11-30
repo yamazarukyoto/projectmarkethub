@@ -11,13 +11,20 @@ import { Job } from "@/types";
 export function JobForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    title: string;
+    description: string;
+    category: string;
+    budget: string;
+    deadline: string;
+    type: "project" | "competition" | "task";
+  }>({
     title: "",
     description: "",
     category: "development",
     budget: "",
     deadline: "",
-    type: "project" as const,
+    type: "project",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -92,7 +99,7 @@ export function JobForm() {
             <select
               className="w-full rounded-lg border-gray-300 focus:border-primary focus:ring-primary"
               value={formData.type}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
+              onChange={(e) => setFormData({ ...formData, type: e.target.value as "project" | "competition" | "task" })}
             >
               <option value="project">プロジェクト方式</option>
               <option value="competition">コンペ方式</option>

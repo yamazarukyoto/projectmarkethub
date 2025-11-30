@@ -7,13 +7,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { createJob } from "@/lib/db";
-import { storage } from "@/lib/firebase";
+import { storage, auth } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Timestamp } from "firebase/firestore";
 import { Upload, X, FileText } from "lucide-react";
+import { PaymentModal } from "@/components/features/contract/PaymentModal";
 
 const jobSchema = z.object({
     title: z.string().min(1, "タイトルを入力してください"),
@@ -99,6 +100,11 @@ export default function PostJobPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [files, setFiles] = useState<File[]>([]);
     const [isDragging, setIsDragging] = useState(false);
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+    const [clientSecret, setClientSecret] = useState<string | null>(null);
+    const [createdJobId, setCreatedJobId] = useState<string | null>(null);
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+    const [pendingJobData, setPendingJobData] = useState<JobFormValues | null>(null);
 
     const {
         register,
@@ -168,12 +174,17 @@ export default function PostJobPage() {
         return urls;
     };
 
-    const onSubmit = async (data: JobFormValues) => {
-        console.log("Form submitted", data);
-        if (!user) {
+    const onSubmit = (data: JobFormValues) => {
+        setPendingJobData(data);
+        setIsConfirmModalOpen(true);
+    };
+
+    const handleConfirmSubmit = async () => {
+        if (!user || !pendingJobData) {
             alert("ログインしてください");
             return;
         }
+        setIsConfirmModalOpen(false);
         setIsLoading(true);
         try {
             // Upload files first
@@ -183,33 +194,33 @@ export default function PostJobPage() {
                 clientId: user.uid,
                 clientName: user.displayName,
                 clientPhotoURL: user.photoURL,
-                title: data.title,
-                description: data.description,
-                category: data.category,
-                type: data.type,
-                budgetType: data.budgetType,
-                deadline: Timestamp.fromDate(new Date(data.deadline)),
-                status: "open",
+                title: pendingJobData.title,
+                description: pendingJobData.description,
+                category: pendingJobData.category,
+                type: pendingJobData.type,
+                budgetType: pendingJobData.budgetType,
+                deadline: Timestamp.fromDate(new Date(pendingJobData.deadline)),
+                status: pendingJobData.type === "project" ? "open" : "draft", // コンペ・タスクは仮払い待ちのためdraft
                 createdAt: Timestamp.now(),
                 updatedAt: Timestamp.now(),
-                tags: data.tags.split(",").map(t => t.trim()).filter(t => t),
+                tags: pendingJobData.tags.split(",").map(t => t.trim()).filter(t => t),
                 attachments: attachmentUrls,
             };
 
-            if (data.type === "project") {
-                jobData.budget = data.budget;
-            } else if (data.type === "competition") {
-                jobData.budget = data.budget;
+            if (pendingJobData.type === "project") {
+                jobData.budget = pendingJobData.budget;
+            } else if (pendingJobData.type === "competition") {
+                jobData.budget = pendingJobData.budget;
                 jobData.competition = {
                     guaranteed: false, // Default
                 };
-            } else if (data.type === "task") {
-                jobData.budget = (data.taskQuantity || 0) * (data.taskUnitPrice || 0);
+            } else if (pendingJobData.type === "task") {
+                jobData.budget = (pendingJobData.taskQuantity || 0) * (pendingJobData.taskUnitPrice || 0);
                 jobData.task = {
-                    quantity: data.taskQuantity,
-                    unitPrice: data.taskUnitPrice,
-                    timeLimit: data.taskTimeLimit,
-                    questions: data.taskQuestions?.map(q => ({
+                    quantity: pendingJobData.taskQuantity,
+                    unitPrice: pendingJobData.taskUnitPrice,
+                    timeLimit: pendingJobData.taskTimeLimit,
+                    questions: pendingJobData.taskQuestions?.map(q => ({
                         type: q.type,
                         text: q.text,
                         options: q.options ? q.options.split(",").map(o => o.trim()) : undefined,
@@ -218,15 +229,50 @@ export default function PostJobPage() {
             }
 
             console.log("Creating job...", jobData);
-            await createJob(jobData);
-            console.log("Job created successfully");
-            alert("依頼を投稿しました！");
-            router.push("/client/dashboard");
+            const jobId = await createJob(jobData);
+            console.log("Job created successfully", jobId);
+
+            if (pendingJobData.type === "project") {
+                alert("依頼を投稿しました！");
+                router.push("/client/dashboard");
+            } else {
+                // コンペ・タスクの場合は仮払いへ
+                setCreatedJobId(jobId);
+                await handlePayment(jobId, jobData.budget);
+            }
         } catch (err) {
             console.error("Error creating job:", err);
             alert(`エラーが発生しました: ${err instanceof Error ? err.message : "不明なエラー"}`);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handlePayment = async (jobId: string, amount: number) => {
+        try {
+            const token = await auth.currentUser?.getIdToken();
+            const res = await fetch("/api/stripe/create-payment-intent", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ jobId, amount }),
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+
+            if (data.skipped) {
+                alert("仮払い（デモ）が完了し、募集を開始しました！");
+                router.push("/client/dashboard");
+                return;
+            }
+
+            setClientSecret(data.clientSecret);
+            setIsPaymentModalOpen(true);
+        } catch (error) {
+            console.error("Error creating payment intent:", error);
+            alert("仮払い準備中にエラーが発生しました。");
         }
     };
 
@@ -452,6 +498,117 @@ export default function PostJobPage() {
                     </form>
                 </CardContent>
             </Card>
+
+            {clientSecret && (
+                <PaymentModal
+                    isOpen={isPaymentModalOpen}
+                    onClose={() => setIsPaymentModalOpen(false)}
+                    clientSecret={clientSecret}
+                    onSuccess={() => {
+                        setIsPaymentModalOpen(false);
+                        alert("仮払いが完了し、募集を開始しました！");
+                        router.push("/client/dashboard");
+                    }}
+                />
+            )}
+
+            {/* Confirmation Modal */}
+            {isConfirmModalOpen && pendingJobData && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center p-4 border-b">
+                            <h3 className="text-lg font-semibold text-gray-900">依頼内容の確認</h3>
+                            <button onClick={() => setIsConfirmModalOpen(false)} className="text-gray-500 hover:text-gray-700">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <h4 className="text-sm font-bold text-gray-500">タイトル</h4>
+                                <p className="text-lg font-medium">{pendingJobData.title}</p>
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-bold text-gray-500">依頼形式</h4>
+                                <p>
+                                    {pendingJobData.type === "project" && "プロジェクト方式"}
+                                    {pendingJobData.type === "competition" && "コンペ方式"}
+                                    {pendingJobData.type === "task" && "タスク方式"}
+                                </p>
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-bold text-gray-500">カテゴリー</h4>
+                                <p>{pendingJobData.category}</p>
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-bold text-gray-500">期限</h4>
+                                <p>{pendingJobData.deadline}</p>
+                            </div>
+
+                            <div className="bg-gray-50 p-4 rounded-lg border">
+                                <h4 className="text-sm font-bold text-gray-900 mb-2">お支払い金額（概算）</h4>
+                                {pendingJobData.type === "project" ? (
+                                    <div className="space-y-1">
+                                        <div className="flex justify-between text-sm">
+                                            <span>予算金額 (税抜)</span>
+                                            <span>{pendingJobData.budget?.toLocaleString()} 円</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span>消費税 (10%)</span>
+                                            <span>{Math.floor((pendingJobData.budget || 0) * 0.1).toLocaleString()} 円</span>
+                                        </div>
+                                        <div className="flex justify-between font-bold text-lg border-t pt-2 mt-2">
+                                            <span>合計</span>
+                                            <span>{Math.floor((pendingJobData.budget || 0) * 1.1).toLocaleString()} 円</span>
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-2">※プロジェクト方式の場合、実際の契約金額はワーカーとの交渉により決定します。この段階では支払いは発生しません。</p>
+                                    </div>
+                                ) : pendingJobData.type === "competition" ? (
+                                    <div className="space-y-1">
+                                        <div className="flex justify-between text-sm">
+                                            <span>採用報酬額 (税抜)</span>
+                                            <span>{pendingJobData.budget?.toLocaleString()} 円</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span>消費税 (10%)</span>
+                                            <span>{Math.floor((pendingJobData.budget || 0) * 0.1).toLocaleString()} 円</span>
+                                        </div>
+                                        <div className="flex justify-between font-bold text-lg border-t pt-2 mt-2">
+                                            <span>合計（仮払い金額）</span>
+                                            <span>{Math.floor((pendingJobData.budget || 0) * 1.1).toLocaleString()} 円</span>
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-2">※コンペ方式の場合、募集開始時に仮払いが必要です。</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-1">
+                                        <div className="flex justify-between text-sm">
+                                            <span>単価 {pendingJobData.taskUnitPrice?.toLocaleString()}円 × {pendingJobData.taskQuantity}件</span>
+                                            <span>{((pendingJobData.taskUnitPrice || 0) * (pendingJobData.taskQuantity || 0)).toLocaleString()} 円</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span>消費税 (10%)</span>
+                                            <span>{Math.floor(((pendingJobData.taskUnitPrice || 0) * (pendingJobData.taskQuantity || 0)) * 0.1).toLocaleString()} 円</span>
+                                        </div>
+                                        <div className="flex justify-between font-bold text-lg border-t pt-2 mt-2">
+                                            <span>合計（仮払い金額）</span>
+                                            <span>{Math.floor(((pendingJobData.taskUnitPrice || 0) * (pendingJobData.taskQuantity || 0)) * 1.1).toLocaleString()} 円</span>
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-2">※タスク方式の場合、募集開始時に仮払いが必要です。</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex justify-end gap-4 pt-4">
+                                <Button variant="ghost" onClick={() => setIsConfirmModalOpen(false)}>
+                                    修正する
+                                </Button>
+                                <Button onClick={handleConfirmSubmit} disabled={isLoading}>
+                                    {pendingJobData.type === "project" ? "依頼を投稿する" : "仮払いへ進む"}
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

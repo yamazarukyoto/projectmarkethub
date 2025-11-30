@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <title>Project Market Hub - Sales Presentation</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.0.4/reset.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.0.4/reveal.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.0.4/theme/white.min.css">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #00A3AF;
+            --secondary: #0F2350;
+            --accent: #FF9F1C;
+            --text-body: #374151;
+            --bg-color: #F9FAFB;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            font-family: 'Noto Sans JP', sans-serif;
+        }
+
+        .reveal {
+            color: var(--text-body);
+        }
+
+        .reveal h1, .reveal h2, .reveal h3, .reveal h4, .reveal h5, .reveal h6 {
+            color: var(--secondary);
+            font-family: 'Noto Sans JP', sans-serif;
+            text-transform: none;
+        }
+
+        .reveal h1 {
+            font-weight: 700;
+        }
+
+        .reveal h2 {
+            color: var(--primary);
+        }
+
+        .reveal section img {
+            border: none;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border-radius: 0.5rem;
+        }
+
+        .highlight {
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        .accent {
+            color: var(--accent);
+            font-weight: bold;
+        }
+
+        .bg-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .bg-secondary {
+            background-color: var(--secondary);
+            color: white;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: left;
+            margin-bottom: 20px;
+        }
+
+        .flex-container {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+        }
+
+        .flex-item {
+            flex: 1;
+        }
+        
+        .reveal ul {
+            display: block;
+            text-align: left;
+        }
+        
+        .reveal li {
+            margin-bottom: 10px;
+        }
+
+        /* Custom Slide Backgrounds */
+        .title-slide {
+            background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%);
+            color: white !important;
+        }
+        
+        .title-slide h1, .title-slide h3, .title-slide p {
+            color: white !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="reveal">
+        <div class="slides">
+            <!-- Slide 1: Title -->
+            <section class="title-slide">
+                <h1>Project Market Hub</h1>
+                <h3>信頼と知性が交差する、<br>次世代クラウドソーシングプラットフォーム</h3>
+                <p style="margin-top: 50px; font-size: 0.8em;">2025年11月30日</p>
+            </section>
+
+            <!-- Slide 2: Introduction -->
+            <section>
+                <h2>Project Market Hubとは</h2>
+                <p class="fragment fade-up">ビジネスを加速させる、最適なマッチングを。</p>
+                <div style="text-align: left; margin-top: 30px; font-size: 0.9em;">
+                    <p>仕事を依頼したい<strong>「クライアント（発注者）」</strong>と、<br>スキルを持つ<strong>「ワーカー（受注者）」</strong>を繋ぐプラットフォームです。</p>
+                    <p>単なるマッチングだけでなく、契約から決済、納品までをワンストップで安全に管理します。</p>
+                </div>
+                <div class="flex-container" style="margin-top: 40px;">
+                    <div class="card flex-item fragment fade-up">
+                        <h4 class="highlight">シームレス</h4>
+                        <p style="font-size: 0.7em;">発注も受注も、これ一つで。</p>
+                    </div>
+                    <div class="card flex-item fragment fade-up">
+                        <h4 class="highlight">セキュア</h4>
+                        <p style="font-size: 0.7em;">エスクロー決済で安心。</p>
+                    </div>
+                    <div class="card flex-item fragment fade-up">
+                        <h4 class="highlight">スマート</h4>
+                        <p style="font-size: 0.7em;">直感的なUIで効率化。</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 3: Problems -->
+            <section>
+                <h2>解決する課題</h2>
+                <div style="text-align: left;">
+                    <div class="fragment fade-right" style="margin-bottom: 20px;">
+                        <h3>😫 手続きの煩雑さ</h3>
+                        <p>「発注者」と「受注者」でアカウントを使い分ける必要があり、管理が面倒。</p>
+                    </div>
+                    <div class="fragment fade-right" style="margin-bottom: 20px;">
+                        <h3>💸 金銭トラブルへの不安</h3>
+                        <p>「納品したのに支払われない」「支払ったのに納品されない」といったリスク。</p>
+                    </div>
+                    <div class="fragment fade-right">
+                        <h3>🤝 ミスマッチと品質</h3>
+                        <p>相手の信頼性が見えにくく、期待通りの成果物が得られない。</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 4: Dual Mode -->
+            <section>
+                <h2>最大の特徴：デュアルモード</h2>
+                <h3>単一アカウント・デュアルモードシステム</h3>
+                <div class="flex-container" style="align-items: center;">
+                    <div class="flex-item" style="text-align: left;">
+                        <p>ログアウトすることなく、スイッチ一つで<strong>「クライアントモード」</strong>と<strong>「ワーカーモード」</strong>を瞬時に切り替え可能。</p>
+                        <ul>
+                            <li class="fragment">今日は発注者、明日は受注者として。</li>
+                            <li class="fragment">ビジネスの機会を逃しません。</li>
+                            <li class="fragment">アカウント管理の手間を半減。</li>
+                        </ul>
+                    </div>
+                    <div class="flex-item">
+                        <!-- Placeholder for UI Image -->
+                        <div style="background: #eee; height: 200px; display: flex; align-items: center; justify-content: center; border-radius: 10px; border: 2px dashed #ccc;">
+                            <span style="color: #888;">モード切替スイッチ UI</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 5: Job Types -->
+            <section>
+                <h2>3つの発注形式</h2>
+                <p>あらゆるニーズに対応する柔軟なスタイル</p>
+                <div class="flex-container" style="font-size: 0.8em;">
+                    <div class="card flex-item fragment">
+                        <h4 style="color: var(--secondary);">プロジェクト</h4>
+                        <p>システム開発、デザイン制作など</p>
+                        <hr>
+                        <p>特定のワーカーとじっくり進める形式</p>
+                    </div>
+                    <div class="card flex-item fragment">
+                        <h4 style="color: var(--secondary);">コンペ</h4>
+                        <p>ロゴ作成、ネーミングなど</p>
+                        <hr>
+                        <p>多数の提案から選ぶ形式</p>
+                    </div>
+                    <div class="card flex-item fragment">
+                        <h4 style="color: var(--secondary);">タスク</h4>
+                        <p>アンケート、データ入力など</p>
+                        <hr>
+                        <p>単純作業を大量に依頼する形式</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 6: Payment -->
+            <section>
+                <h2>安心・安全の決済システム</h2>
+                <h3>トラブルを防ぐ「エスクロー（仮払い）」</h3>
+                <ol style="font-size: 0.9em; margin-top: 20px;">
+                    <li class="fragment"><strong>仮払い:</strong> 契約時にクライアントが代金を預け入れ</li>
+                    <li class="fragment"><strong>業務開始:</strong> 入金確認後、ワーカーが作業開始（未払いリスクなし）</li>
+                    <li class="fragment"><strong>納品・検収:</strong> 成果物を確認</li>
+                    <li class="fragment"><strong>本払い:</strong> 検収完了後、報酬支払い（持ち逃げリスクなし）</li>
+                </ol>
+                <div style="margin-top: 30px; background: #f0f4f8; padding: 15px; border-radius: 8px;">
+                    <p style="margin: 0;">Powered by <strong style="color: #635BFF;">Stripe</strong> - 世界基準のセキュリティ</p>
+                </div>
+            </section>
+
+            <!-- Slide 7: Trust -->
+            <section>
+                <h2>信頼性の担保</h2>
+                <div class="flex-container">
+                    <div class="card flex-item fragment">
+                        <h4>👤 本人確認</h4>
+                        <p>Stripe Identityによる厳格な本人確認（免許証・マイナンバーカード等）を導入。「誰と取引しているか」が明確です。</p>
+                    </div>
+                    <div class="card flex-item fragment">
+                        <h4>⭐ 相互評価</h4>
+                        <p>仕事の品質、納期、コミュニケーションを5段階で評価。信頼できるパートナー選びをサポートします。</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 8: Flow -->
+            <section>
+                <h2>ご利用の流れ</h2>
+                <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
+                    <div class="fragment fade-down" style="background: var(--secondary); color: white; padding: 15px; width: 80%; border-radius: 5px;">
+                        1. 募集・応募
+                    </div>
+                    <div class="fragment fade-down" style="font-size: 20px;">⬇</div>
+                    <div class="fragment fade-down" style="background: var(--primary); color: white; padding: 15px; width: 80%; border-radius: 5px;">
+                        2. 契約・仮払い
+                    </div>
+                    <div class="fragment fade-down" style="font-size: 20px;">⬇</div>
+                    <div class="fragment fade-down" style="background: var(--secondary); color: white; padding: 15px; width: 80%; border-radius: 5px;">
+                        3. 業務・納品
+                    </div>
+                    <div class="fragment fade-down" style="font-size: 20px;">⬇</div>
+                    <div class="fragment fade-down" style="background: var(--accent); color: white; padding: 15px; width: 80%; border-radius: 5px;">
+                        4. 検収・支払い
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 9: Pricing -->
+            <section>
+                <h2>料金体系</h2>
+                <div style="display: flex; justify-content: center; gap: 30px; margin-top: 30px;">
+                    <div class="card fragment" style="flex: 1; text-align: center;">
+                        <h3>登録・発注</h3>
+                        <p style="font-size: 3em; color: var(--primary); font-weight: bold; margin: 20px 0;">¥0</p>
+                        <p>初期費用・月額費用なし</p>
+                    </div>
+                    <div class="card fragment" style="flex: 1; text-align: center; border: 2px solid var(--accent);">
+                        <h3>システム手数料</h3>
+                        <p style="font-size: 3em; color: var(--accent); font-weight: bold; margin: 20px 0;">5%</p>
+                        <p>業界最安水準</p>
+                        <p style="font-size: 0.6em; color: #666;">※ワーカー報酬から差し引き</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 10: Contact -->
+            <section class="title-slide">
+                <h2>お問い合わせ</h2>
+                <p>ビジネスの新しい可能性を、ここから。</p>
+                <div style="margin-top: 50px; background: rgba(255,255,255,0.1); padding: 30px; border-radius: 10px;">
+                    <p><strong>Project Market Hub</strong></p>
+                    <p>🌐 https://project-market-hub.com/</p>
+                    <p>✉️ service@meeting-agency.com</p>
+                    <p>運営: 山本健太</p>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.0.4/reveal.min.js"></script>
+    <script>
+        Reveal.initialize({
+            hash: true,
+            transition: 'slide', // none/fade/slide/convex/concave/zoom
+            autoPlayMedia: true,
+        });
+    </script>
+</body>
+</html>

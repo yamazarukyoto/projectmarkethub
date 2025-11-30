@@ -1,13 +1,22 @@
 import { NextResponse } from "next/server";
-import { stripe } from "@/lib/stripe";
-import { db } from "@/lib/firebase";
-import { doc, getDoc, updateDoc, addDoc, collection, Timestamp } from "firebase/firestore";
+import { adminDb } from "@/lib/firebase-admin";
+import * as admin from "firebase-admin";
 
 export async function POST(req: Request) {
     try {
-        const { proposalId, jobId, clientId, workerId, price, title, type } = await req.json();
+        const { proposalId, jobId, clientId, workerId, price, title } = await req.json();
 
-        if (!jobId || !clientId || !workerId || !price || !type) {
+        // type is optional in request, default to 'project' if not provided, or fetch from job
+        // But let's assume it's passed or we can fetch job to get type.
+        // For now, let's fetch job to be safe and get type.
+        const jobDoc = await adminDb.collection("jobs").doc(jobId).get();
+        if (!jobDoc.exists) {
+             return NextResponse.json({ error: "Job not found" }, { status: 404 });
+        }
+        const jobData = jobDoc.data();
+        const type = jobData?.type || "project";
+
+        if (!jobId || !clientId || !workerId || !price) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
         }
 
@@ -15,69 +24,45 @@ export async function POST(req: Request) {
         const platformFee = Math.floor(price * 0.05);
         const workerAmount = price - platformFee;
 
-        // Get worker's Stripe Account ID
-        const workerDoc = await getDoc(doc(db, "users", workerId));
-        const workerStripeId = workerDoc.data()?.stripeAccountId;
+        // 1. Create Contract in Firestore
+        // For Competition, payment is already done at Job creation, so status is 'escrow'
+        const isCompetition = type === 'competition';
+        const initialStatus = isCompetition ? 'escrow' : 'waiting_for_escrow';
+        const paymentIntentId = isCompetition ? (jobData?.stripePaymentIntentId || "") : "";
+        const escrowAt = isCompetition ? admin.firestore.FieldValue.serverTimestamp() : null;
 
-        if (!workerStripeId) {
-            return NextResponse.json({ error: "Worker has not connected Stripe" }, { status: 400 });
-        }
-
-        let paymentIntentId = "";
-        let clientSecret = "";
-
-        // For Fixed Price, create PaymentIntent for Escrow
-        const paymentIntent = await stripe.paymentIntents.create({
-            amount: price,
-            currency: "jpy",
-            payment_method_types: ["card"],
-            transfer_data: {
-                destination: workerStripeId,
-            },
-            application_fee_amount: platformFee,
-            capture_method: "manual", // Escrow
-            metadata: {
-                jobId,
-                proposalId: proposalId || "",
-                clientId,
-                workerId,
-                type: "contract_payment",
-            },
-        });
-        paymentIntentId = paymentIntent.id;
-        clientSecret = paymentIntent.client_secret || "";
-
-        // 2. Create Contract in Firestore
-        const contractRef = await addDoc(collection(db, "contracts"), {
+        const contractRef = await adminDb.collection("contracts").add({
             jobId,
+            proposalId, // Save proposalId for linking back to chat
             clientId,
             workerId,
-            jobTitle: title,
-            type,
+            jobTitle: title || jobData?.title,
+            jobType: type, // Use jobType to match interface
             amount: price,
-            tax: 0,
+            tax: Math.floor(price * 0.1), // Add tax calculation
+            totalAmount: Math.floor(price * 1.1), // Add total amount
             platformFee: platformFee,
             workerReceiveAmount: workerAmount,
-            status: "escrow",
+            status: initialStatus,
             stripePaymentIntentId: paymentIntentId,
-            createdAt: Timestamp.now(),
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            ...(escrowAt && { escrowAt }),
         });
 
-        // 3. Update Proposal status (if exists)
+        // 2. Update Proposal status (if exists)
         if (proposalId) {
-            await updateDoc(doc(db, "proposals", proposalId), {
+            await adminDb.collection("proposals").doc(proposalId).update({
                 status: "hired",
             });
         }
 
-        // 4. Update Job status
-        await updateDoc(doc(db, "jobs", jobId), {
+        // 3. Update Job status
+        await adminDb.collection("jobs").doc(jobId).update({
             status: "filled",
         });
 
         return NextResponse.json({
-            contractId: contractRef.id,
-            clientSecret: clientSecret
+            contractId: contractRef.id
         });
 
     } catch (error) {

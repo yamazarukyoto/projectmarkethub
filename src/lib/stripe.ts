@@ -1,9 +1,9 @@
 import Stripe from 'stripe';
 
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'dummy_key', {
-    apiVersion: '2024-11-20.acacia',
+    apiVersion: '2024-11-20.acacia' as any, // Force version or update package
     typescript: true,
-} as any);
+});
 
 export const createPaymentIntent = async (
     amount: number,
@@ -89,8 +89,7 @@ export const createAccountLink = async (
 
 export const createVerificationSession = async (
     userId: string,
-    returnUrl: string,
-    cancelUrl: string
+    returnUrl: string
 ): Promise<Stripe.Identity.VerificationSession> => {
     return await stripe.identity.verificationSessions.create({
         type: 'document',

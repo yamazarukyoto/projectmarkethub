@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/components/providers/AuthProvider";
+import { updateUser } from "@/lib/db";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 
 export default function NotificationSettingsPage() {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [settings, setSettings] = useState({
     emailMessage: true,
@@ -13,16 +16,26 @@ export default function NotificationSettingsPage() {
     emailDaily: false,
   });
 
+  useEffect(() => {
+    if (user && user.notificationSettings) {
+      setSettings(user.notificationSettings);
+    }
+  }, [user]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
+
     setLoading(true);
     try {
-      // TODO: Implement update logic
-      console.log("Update notification settings", settings);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await updateUser(user.uid, {
+        notificationSettings: settings,
+        updatedAt: new Date() as any,
+      });
       alert("保存しました");
     } catch (error) {
       console.error(error);
+      alert("保存に失敗しました");
     } finally {
       setLoading(false);
     }

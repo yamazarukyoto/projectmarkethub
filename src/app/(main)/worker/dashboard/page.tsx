@@ -117,13 +117,14 @@ export default function WorkerDashboard() {
                 </Card>
             </div>
 
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
                 <h2 className="text-xl font-bold text-secondary">応募管理</h2>
-                <div className="flex gap-2">
+                <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 whitespace-nowrap">
                     <Button 
                         variant={filter === 'all' ? 'primary' : 'ghost'} 
                         size="sm" 
                         onClick={() => setFilter('all')}
+                        className="whitespace-nowrap"
                     >
                         すべて
                     </Button>
@@ -131,6 +132,7 @@ export default function WorkerDashboard() {
                         variant={filter === 'pending' ? 'primary' : 'ghost'} 
                         size="sm" 
                         onClick={() => setFilter('pending')}
+                        className="whitespace-nowrap"
                     >
                         選考中
                     </Button>
@@ -138,6 +140,7 @@ export default function WorkerDashboard() {
                         variant={filter === 'hired' ? 'primary' : 'ghost'} 
                         size="sm" 
                         onClick={() => setFilter('hired')}
+                        className="whitespace-nowrap"
                     >
                         採用済み
                     </Button>
@@ -145,6 +148,7 @@ export default function WorkerDashboard() {
                         variant={filter === 'rejected' ? 'primary' : 'ghost'} 
                         size="sm" 
                         onClick={() => setFilter('rejected')}
+                        className="whitespace-nowrap"
                     >
                         不採用
                     </Button>
@@ -160,8 +164,8 @@ export default function WorkerDashboard() {
                             <CardContent className="p-6">
                                 <div className="flex flex-col md:flex-row justify-between gap-4">
                                     <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <span className={`px-2 py-0.5 rounded text-xs font-medium flex items-center gap-1 ${
+                                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                                            <span className={`px-2 py-0.5 rounded text-xs font-medium flex items-center gap-1 whitespace-nowrap ${
                                                 app.status === 'hired' || app.status === 'adopted' ? 'bg-green-100 text-green-800' :
                                                 app.status === 'rejected' ? 'bg-red-100 text-red-800' :
                                                 'bg-yellow-100 text-yellow-800'
@@ -172,7 +176,7 @@ export default function WorkerDashboard() {
                                                 {app.status === 'hired' || app.status === 'adopted' ? '採用' :
                                                  app.status === 'rejected' ? '不採用' : '選考中'}
                                             </span>
-                                            <span className="text-xs text-gray-500">
+                                            <span className="text-xs text-gray-500 whitespace-nowrap">
                                                 応募日: {app.createdAt.toDate().toLocaleDateString()}
                                             </span>
                                         </div>
@@ -188,14 +192,14 @@ export default function WorkerDashboard() {
                                         <p className="text-sm text-gray-500 line-clamp-2">{app.message}</p>
                                     </div>
 
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 mt-4 md:mt-0 w-full md:w-auto justify-end">
                                         <Link href={`/worker/jobs/${app.jobId}`}>
-                                            <Button variant="outline" size="sm">詳細を見る</Button>
+                                            <Button variant="outline" size="sm" className="whitespace-nowrap">詳細を見る</Button>
                                         </Link>
                                         <Button 
                                             variant="ghost" 
                                             size="sm" 
-                                            className="text-danger hover:bg-red-50 hover:text-danger"
+                                            className="text-danger hover:bg-red-50 hover:text-danger whitespace-nowrap"
                                             onClick={() => handleDelete(app.id)}
                                         >
                                             <Trash2 size={16} />
@@ -228,23 +232,25 @@ export default function WorkerDashboard() {
                     {recentJobs.map((job) => (
                         <Card key={job.id} className="hover:shadow-md transition-shadow">
                             <CardContent className="p-6">
-                                <div className="flex justify-between items-start">
+                                <div className="flex flex-col md:flex-row justify-between items-start gap-4">
                                     <div>
                                         <h3 className="text-lg font-bold mb-2">{job.title}</h3>
                                         <p className="text-sm text-gray-500 mb-2">
                                             {job.clientName} • {job.budget.toLocaleString()}円
                                         </p>
-                                        <div className="flex gap-2">
+                                        <div className="flex flex-wrap gap-2">
                                             {job.tags.map(tag => (
-                                                <span key={tag} className="px-2 py-1 bg-gray-100 text-xs rounded text-gray-600">
+                                                <span key={tag} className="px-2 py-1 bg-gray-100 text-xs rounded text-gray-600 whitespace-nowrap">
                                                     {tag}
                                                 </span>
                                             ))}
                                         </div>
                                     </div>
-                                    <Link href={`/worker/jobs/${job.id}`}>
-                                        <Button variant="outline" size="sm">詳細を見る</Button>
-                                    </Link>
+                                    <div className="w-full md:w-auto flex justify-end">
+                                        <Link href={`/worker/jobs/${job.id}`}>
+                                            <Button variant="outline" size="sm" className="whitespace-nowrap">詳細を見る</Button>
+                                        </Link>
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>
