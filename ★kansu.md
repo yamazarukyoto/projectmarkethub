@@ -10,10 +10,10 @@
 | `getUser` | ユーザー情報を取得 | `uid: string` | `Promise<User \| null>` | 3.1, 4.1 |
 | `createUser` | 新規ユーザーを作成 | `user: User` | `Promise<void>` | 3.2.A |
 | `updateUser` | ユーザー情報を更新 (基本情報、プロフィール等) | `uid: string`, `data: Partial<User>` | `Promise<void>` | 3.2.A, 3.2.B, 3.2.C |
-| `updateVerificationStatus` | 本人確認ステータスを更新 | `uid: string`, `status: string`, `reason?: string` | `Promise<void>` | 3.3 (3) |
+| `updateVerificationStatus` | 本人確認ステータスを更新 | `uid: string`, `status: User["verificationStatus"]`, `reason?: string` | `Promise<void>` | 3.3 (3) |
 | `updateStripeConnectId` | Stripe ConnectアカウントIDを紐付け | `uid: string`, `accountId: string` | `Promise<void>` | 3.3 (4) |
 | `updateUserRating` | ユーザーの評価・レビュー数を更新 | `uid: string`, `rating: number`, `count: number` | `Promise<void>` | 2.1.9 |
-| `getWorkers` | ワーカー一覧を取得 | - | `Promise<User[]>` | - |
+| `getWorkers` | ワーカー一覧を取得 (スキルフィルタ対応) | `skill?: string` | `Promise<User[]>` | - |
 
 ## 2. 案件管理 (Job Management)
 **File:** `src/lib/db.ts`
@@ -53,10 +53,10 @@
 
 | 関数名 | 説明 | 引数 | 戻り値 | 関連仕様 |
 | --- | --- | --- | --- | --- |
-| `createTaskSubmission` | タスク作業を開始 (排他制御含む) | `submission: any` | `Promise<string>` (ID) | 2.3.2 |
-| `getTaskSubmission` | 作業内容を取得 | `submissionId: string` | `Promise<any \| null>` | - |
-| `getTaskSubmissionsByJob` | 案件の全作業提出を取得 | `jobId: string` | `Promise<any[]>` | 2.3.3 |
-| `submitTaskAnswers` | タスク回答を提出 (完了) | `submissionId: string`, `answers: any[]` | `Promise<void>` | 2.3.2 |
+| `createTaskSubmission` | タスク作業を開始 (排他制御含む) | `submission: Omit<TaskSubmission, "id">` | `Promise<string>` (ID) | 2.3.2 |
+| `getTaskSubmission` | 作業内容を取得 | `submissionId: string` | `Promise<TaskSubmission \| null>` | - |
+| `getTaskSubmissionsByJob` | 案件の全作業提出を取得 | `jobId: string` | `Promise<TaskSubmission[]>` | 2.3.3 |
+| `submitTaskAnswers` | タスク回答を提出 (完了) | `submissionId: string`, `answers: TaskSubmission["answers"]` | `Promise<void>` | 2.3.2 |
 | `reviewTaskSubmission` | 作業を承認/非承認 | `submissionId: string`, `status: 'approved' \| 'rejected'`, `reason?: string` | `Promise<void>` | 2.3.3 |
 
 ## 6. 決済・Stripe (Payment System)
@@ -70,7 +70,7 @@
 | `createRefund` | 返金処理 | `paymentIntentId: string`, `amount?: number`, `metadata: Record<string, string>` | `Promise<Stripe.Refund>` | 2.4.3 |
 | `createConnectAccount` | Stripe Connect Expressアカウント作成 | `email: string` | `Promise<Stripe.Account>` | 3.3 (4) |
 | `createAccountLink` | Connect Onboardingリンク作成 | `accountId: string`, `refreshUrl: string`, `returnUrl: string` | `Promise<Stripe.AccountLink>` | 3.3 (4) |
-| `createVerificationSession` | 本人確認セッション作成 | `userId: string`, `returnUrl: string`, `cancelUrl: string` | `Promise<Stripe.Identity.VerificationSession>` | 3.3 (3) |
+| `createVerificationSession` | 本人確認セッション作成 | `userId: string`, `returnUrl: string` | `Promise<Stripe.Identity.VerificationSession>` | 3.3 (3) |
 | `POST /api/stripe/webhook` | Stripe Webhook処理 | `Request` | `Response` | 5.3 |
 
 ## 7. 通知 (Notifications)
@@ -78,8 +78,8 @@
 
 | 関数名 | 説明 | 引数 | 戻り値 | 関連仕様 |
 | --- | --- | --- | --- | --- |
-| `createNotification` | 通知を作成 | `notification: any` | `Promise<string>` | 5.4 |
-| `getNotifications` | ユーザーの通知一覧を取得 | `userId: string` | `Promise<any[]>` | 5.4 |
+| `createNotification` | 通知を作成 | `notification: Omit<Notification, "id">` | `Promise<string>` | 5.4 |
+| `getNotifications` | ユーザーの通知一覧を取得 | `userId: string` | `Promise<Notification[]>` | 5.4 |
 | `markAsRead` | 通知を既読にする | `notificationId: string` | `Promise<void>` | - |
 
 ## 8. ストレージ (Storage)
