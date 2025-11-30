@@ -45,6 +45,7 @@ export interface User {
         skills: string[];
         portfolioUrls?: string[];
         hoursPerWeek?: string;
+        desiredUnitPrice?: number;
     };
 
     // Notification Settings

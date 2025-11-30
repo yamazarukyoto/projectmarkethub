@@ -201,6 +201,12 @@ export default function WorkerJobDetailPage() {
                                     <Clock size={16} />
                                     <span>掲載日: {job.createdAt?.toDate ? job.createdAt.toDate().toLocaleDateString() : '不明'}</span>
                                 </div>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-sm text-gray-600">クライアント:</span>
+                                    <Link href={`/users/${job.clientId}`} className="text-primary hover:underline font-medium">
+                                        {job.clientName}
+                                    </Link>
+                                </div>
                             </div>
 
                             <div className="prose max-w-none">

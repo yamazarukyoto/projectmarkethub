@@ -264,7 +264,10 @@ export default function ClientJobDetailPage() {
                                         <Card key={proposal.id}>
                                             <CardContent className="p-4">
                                                 <div className="flex items-center gap-3 mb-3">
-                                                    <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden">
+                                                    <div 
+                                                        className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden cursor-pointer hover:opacity-80"
+                                                        onClick={() => router.push(`/users/${proposal.workerId}`)}
+                                                    >
                                                         {proposal.workerPhotoURL ? (
                                                             <img src={proposal.workerPhotoURL} alt={proposal.workerName} className="w-full h-full object-cover" />
                                                         ) : (
@@ -272,7 +275,12 @@ export default function ClientJobDetailPage() {
                                                         )}
                                                     </div>
                                                     <div>
-                                                        <p className="font-medium">{proposal.workerName}</p>
+                                                        <p 
+                                                            className="font-medium cursor-pointer hover:text-primary hover:underline"
+                                                            onClick={() => router.push(`/users/${proposal.workerId}`)}
+                                                        >
+                                                            {proposal.workerName}
+                                                        </p>
                                                         <p className="text-xs text-gray-500">{proposal.createdAt.toDate().toLocaleDateString()}</p>
                                                     </div>
                                                 </div>
@@ -297,9 +305,13 @@ export default function ClientJobDetailPage() {
                                                             onClick={async () => {
                                                                 if (!confirm("この提案を採用して契約に進みますか？")) return;
                                                                 try {
+                                                                    const token = await auth.currentUser?.getIdToken();
                                                                     const res = await fetch("/api/contracts/create", {
                                                                         method: "POST",
-                                                                        headers: { "Content-Type": "application/json" },
+                                                                        headers: { 
+                                                                            "Content-Type": "application/json",
+                                                                            Authorization: `Bearer ${token}`,
+                                                                        },
                                                                         body: JSON.stringify({
                                                                             proposalId: proposal.id,
                                                                             jobId: job.id,

@@ -119,6 +119,7 @@ export const Header = () => {
     const clientLinks = [
         { href: "/client/dashboard", label: "ダッシュボード" },
         { href: "/client/jobs/new", label: "仕事を依頼する" },
+        { href: "/client/workers", label: "ワーカーを探す" },
     ];
 
     const workerLinks = [

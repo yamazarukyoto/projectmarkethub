@@ -58,14 +58,47 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to capture payment" }, { status: 500 });
     }
 
-    // 7. DB更新 (ステータス完了)
+    // 7. Transfer to Worker (本払い)
+    const workerId = contract?.workerId;
+    if (workerId) {
+        const workerDoc = await adminDb.collection("users").doc(workerId).get();
+        const workerStripeAccountId = workerDoc.data()?.stripeAccountId;
+        const transferAmount = contract?.workerReceiveAmount;
+
+        if (workerStripeAccountId && transferAmount) {
+            try {
+                const transfer = await stripe.transfers.create({
+                    amount: transferAmount,
+                    currency: "jpy",
+                    destination: workerStripeAccountId,
+                    transfer_group: contract?.jobId, // Group by Job ID
+                    metadata: {
+                        contractId: contractId,
+                        jobId: contract?.jobId,
+                        type: "reward"
+                    }
+                });
+                
+                await contractRef.update({
+                    stripeTransferId: transfer.id
+                });
+                console.log(`Transfer created: ${transfer.id}`);
+            } catch (transferError) {
+                console.error("Transfer failed:", transferError);
+                // Transfer failed but capture succeeded. 
+                // We should log this critical error but still mark contract as completed (or disputed/transfer_failed)
+                // For now, let's mark as completed but log error. Admin needs to handle this manually.
+            }
+        } else {
+            console.warn("Worker has no Stripe account or amount is missing. Skipping transfer.");
+        }
+    }
+
+    // 8. DB更新 (ステータス完了)
     await contractRef.update({
       status: "completed",
       completedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
-
-    // 8. Jobステータス更新 (もし必要なら)
-    // 今回はContractのステータス更新のみとする
 
     return NextResponse.json({ success: true, paymentIntent });
 

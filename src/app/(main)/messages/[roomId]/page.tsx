@@ -111,8 +111,17 @@ export default function MessageRoomPage() {
                     <ArrowLeft size={20} />
                 </Button>
                 <div>
-                    <h1 className="text-xl font-bold text-secondary">
-                        {partnerName} とのメッセージ
+                    <h1 className="text-xl font-bold text-secondary flex items-center gap-2">
+                        <span 
+                            className="cursor-pointer hover:text-primary hover:underline"
+                            onClick={() => {
+                                const partnerId = isClient ? proposal.workerId : job.clientId;
+                                router.push(`/users/${partnerId}`);
+                            }}
+                        >
+                            {partnerName}
+                        </span>
+                        <span>とのメッセージ</span>
                     </h1>
                     <p className="text-sm text-gray-500">案件: {job.title}</p>
                 </div>

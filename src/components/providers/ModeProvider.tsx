@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 type Mode = "client" | "worker";
 
@@ -14,13 +15,24 @@ const ModeContext = createContext<ModeContextType | undefined>(undefined);
 
 export const ModeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [mode, setModeState] = useState<Mode>("worker");
+    const pathname = usePathname();
 
+    // URLに基づいてモードを自動設定
     useEffect(() => {
-        const savedMode = localStorage.getItem("mode") as Mode;
-        if (savedMode) {
-            setModeState(savedMode);
+        if (pathname?.startsWith("/client")) {
+            setModeState("client");
+            localStorage.setItem("mode", "client");
+        } else if (pathname?.startsWith("/worker")) {
+            setModeState("worker");
+            localStorage.setItem("mode", "worker");
+        } else {
+            // その他のページでは保存されたモードを使用
+            const savedMode = localStorage.getItem("mode") as Mode;
+            if (savedMode) {
+                setModeState(savedMode);
+            }
         }
-    }, []);
+    }, [pathname]);
 
     const setMode = (newMode: Mode) => {
         setModeState(newMode);

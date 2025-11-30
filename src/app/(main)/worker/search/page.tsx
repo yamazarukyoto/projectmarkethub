@@ -87,7 +87,10 @@ export default function JobSearchPage() {
                                                         <span className="font-medium">期限:</span> {job.deadline.toDate().toLocaleDateString()}
                                                     </span>
                                                     <span className="flex items-center gap-1">
-                                                        <span className="font-medium">クライアント:</span> {job.clientName}
+                                                        <span className="font-medium">クライアント:</span>
+                                                        <Link href={`/users/${job.clientId}`} className="text-primary hover:underline">
+                                                            {job.clientName}
+                                                        </Link>
                                                     </span>
                                                 </div>
 

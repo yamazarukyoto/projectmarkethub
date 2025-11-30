@@ -55,12 +55,15 @@
       |     |     +-- Profile (/account/profile)
       |     |     +-- Verification (/account/verification)
       |     |     +-- Notifications (/account/notifications)
+      |     +-- Public Profile (/users/[id])
       |     +-- Messages (/messages)
       |           +-- Chat Room (/messages/[roomId])
       |
       +-- [ Client Mode ] (発注者)
       |     |
       |     +-- Dashboard (/client/dashboard)
+      |     |
+      |     +-- Worker Search (/client/workers)
       |     |
       |     +-- Job Management
       |     |     +-- Create New Job (/client/jobs/new) [Header Link]
@@ -165,6 +168,10 @@ stateDiagram-v2
 #### 詳細ステップ & 画面UI仕様
 
 **Phase 1: マッチング (Matching)**
+0.  **ワーカー検索 & スカウト (Client)**
+    *   **Page:** `/client/workers`
+    *   **UI:** ワーカー一覧、スキル検索、プロフィール閲覧。
+    *   **Action:** 気になるワーカーへ「メッセージを送る」または「スカウト（非公開案件の打診）」を行う。
 1.  **募集 (Client)**
     *   **Page:** `/client/jobs/new`
     *   **UI:**
@@ -190,6 +197,7 @@ stateDiagram-v2
 **Phase 2: 契約 & 仮払い (Contract & Escrow)**
 4.  **契約締結 (Client)**
     *   **Page:** `/messages/[roomId]` または `/client/jobs/[id]` (応募者一覧)
+    *   **UI:** 応募者一覧の各カードに「プロフィールを見る」リンクを設置。クリックで `/users/[workerId]` へ遷移し、詳細を確認できる。
     *   **Action:** クライアントが最終条件で「契約する」ボタン押下。
     *   **DB:** `contracts` 作成 (`status: 'waiting_for_escrow'`).
     *   **Transition:** 画面は自動的に `/client/contracts/[id]` へ遷移する。
@@ -803,6 +811,20 @@ CrowdWorksのマイページ構成をベースに、本プラットフォーム�
 | **契約・業務連絡** | ON | 契約締結、仮払い、検収等の通知。 |
 | **スカウトメール** | ON | クライアントからのスカウト。 |
 | **デイリーサマリー** | OFF | おすすめ案件などのまとめメール。 |
+
+#### (6) 公開プロフィールページ (`/users/[id]`)
+**目的:** クライアントが契約前にワーカーのスキルや実績を確認するためのページ。
+**アクセス権:** ログインユーザーであれば誰でも閲覧可能。
+**表示項目:**
+*   **ヘッダー:** 表示名、キャッチコピー、アイコン、本人確認バッジ。
+*   **基本情報:** 職種、稼働可能時間、希望単価。
+*   **自己紹介:** Markdown形式の自己紹介文。
+*   **スキル:** 登録されたスキルタグ一覧。
+*   **実績:**
+    *   総合評価 (Star Rating)
+    *   完了案件数
+    *   評価コメント一覧 (直近の取引)
+*   **アクション:** 「メッセージを送る」ボタン (ログイン時のみ)。
 
 ---
 

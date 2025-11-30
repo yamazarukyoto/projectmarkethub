@@ -204,6 +204,18 @@ export default function RegisterPage() {
                         </div>
                     )}
 
+                    <div className="text-xs text-gray-500 text-center">
+                        登録することで、
+                        <Link href="/terms" className="text-primary hover:underline" target="_blank">
+                            利用規約
+                        </Link>
+                        および
+                        <Link href="/privacy" className="text-primary hover:underline" target="_blank">
+                            プライバシーポリシー
+                        </Link>
+                        に同意したものとみなされます。
+                    </div>
+
                     <Button type="submit" className="w-full" disabled={isLoading}>
                         {isLoading ? "登録中..." : "登録する"}
                     </Button>

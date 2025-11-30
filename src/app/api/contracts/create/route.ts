@@ -1,10 +1,23 @@
 import { NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase-admin";
+import { adminDb, adminAuth } from "@/lib/firebase-admin";
 import * as admin from "firebase-admin";
 
 export async function POST(req: Request) {
     try {
+        // 1. Auth Check
+        const authHeader = req.headers.get("Authorization");
+        if (!authHeader?.startsWith("Bearer ")) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+        const token = authHeader.split("Bearer ")[1];
+        const decodedToken = await adminAuth.verifyIdToken(token);
+        const requestUserId = decodedToken.uid;
+
         const { proposalId, jobId, clientId, workerId, price, title } = await req.json();
+
+        if (clientId !== requestUserId) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
 
         // type is optional in request, default to 'project' if not provided, or fetch from job
         // But let's assume it's passed or we can fetch job to get type.

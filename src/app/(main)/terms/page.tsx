@@ -6,9 +6,9 @@ export default function TermsPage() {
             <h1 className="text-3xl font-bold mb-8 text-secondary">利用規約</h1>
 
             <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100 space-y-8 text-text-body">
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-                    <p className="text-amber-800 font-medium">
-                        ⚠️ 重要：本サービスは個人運営のプラットフォームです。クライアントとワーカー間の取引・紛争について、運営者は仲介・調停・介入を行いません。ユーザー間の問題はユーザー同士で解決していただく必要があります。
+                <div className="mb-6">
+                    <p className="font-medium text-gray-700">
+                        重要：本サービスは個人運営のプラットフォームです。クライアントとワーカー間の取引・紛争について、運営者は仲介・調停・介入を行いません。ユーザー間の問題はユーザー同士で解決していただく必要があります。
                     </p>
                 </div>
 
@@ -76,14 +76,13 @@ export default function TermsPage() {
 
                 <section>
                     <h2 className="text-xl font-bold mb-4 text-secondary border-b pb-2">第6条（ユーザー間取引および紛争）</h2>
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-                        <p className="text-red-800 font-medium">
-                            本条は特に重要な条項です。必ずお読みください。
-                        </p>
-                    </div>
+                    <p className="mb-4 font-medium text-gray-700">
+                        本条は特に重要な条項です。必ずお読みください。
+                    </p>
                     <ol className="list-decimal list-inside space-y-2 ml-2">
                         <li><strong>運営者は、クライアントとワーカー間の取引の当事者ではなく、取引に関する一切の責任を負いません。</strong></li>
                         <li><strong>クライアントとワーカー間で発生した紛争、トラブル、クレーム等について、運営者は仲介、調停、仲裁その他一切の介入を行いません。</strong>ユーザー間の問題は、当事者間で直接解決していただく必要があります。</li>
+                        <li>万が一、ユーザー間の紛争に関連して運営者が対応を余儀なくされた場合（裁判所からの呼び出し、捜査機関への協力等）、その対応に要した費用（弁護士費用、人件費、交通費等を含む）は当該ユーザーが負担するものとします。</li>
                         <li>運営者は、以下の事項について一切関与せず、責任を負いません：
                             <ul className="list-disc list-inside ml-6 mt-2 space-y-1 text-gray-600">
                                 <li>成果物の品質、内容、納期に関する紛争</li>
@@ -192,6 +191,7 @@ export default function TermsPage() {
                 <section>
                     <h2 className="text-xl font-bold mb-4 text-secondary border-b pb-2">第13条（保証の否認および免責事項）</h2>
                     <ol className="list-decimal list-inside space-y-2 ml-2">
+                        <li>本サービスは、現状有姿（As-Is）で提供されるものであり、運営者はその完全性、正確性、有用性、特定目的への適合性等について、いかなる保証も行いません。</li>
                         <li>運営者は、本サービスに事実上または法律上の瑕疵（安全性、信頼性、正確性、完全性、有効性、特定の目的への適合性、セキュリティなどに関する欠陥、エラーやバグ、権利侵害などを含みます。）がないことを明示的にも黙示的にも保証しておりません。</li>
                         <li>運営者は、本サービスに起因してユーザーに生じたあらゆる損害について、運営者の故意または重過失による場合を除き、一切の責任を負いません。</li>
                         <li><strong>運営者は、本サービスに関して、ユーザーと他のユーザーまたは第三者との間において生じた取引、連絡または紛争等について一切責任を負いません。</strong></li>
@@ -206,7 +206,7 @@ export default function TermsPage() {
                     <ol className="list-decimal list-inside space-y-2 ml-2">
                         <li>本サービスは個人運営のため、サポート対応には限界があります。</li>
                         <li>問い合わせへの回答には、数日から数週間を要する場合があります。</li>
-                        <li>以下の問い合わせについては、対応いたしかねます：
+                        <li>以下の問い合わせについては、対応いたしかねます。<strong>また、これらに関する問い合わせには、原則として返信いたしません：</strong>
                             <ul className="list-disc list-inside ml-6 mt-2 space-y-1 text-gray-600">
                                 <li>ユーザー間の紛争に関する仲介・調停の依頼</li>
                                 <li>取引内容、成果物の品質に関する判断の依頼</li>

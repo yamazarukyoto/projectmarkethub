@@ -214,10 +214,25 @@ export const submitContractDelivery = async (contractId: string, deliveryFileUrl
 };
 
 // Worker Functions
-export const getWorkers = async (): Promise<User[]> => {
-    const q = query(collection(db, "users"), where("userType", "in", ["worker", "both"]), orderBy("createdAt", "desc"));
+export const getWorkers = async (skill?: string): Promise<User[]> => {
+    let q = query(collection(db, "users"), where("userType", "in", ["worker", "both"]), orderBy("createdAt", "desc"));
+    
+    // Note: Firestore doesn't support array-contains with 'in' query easily in all cases, 
+    // but for simple skill filtering we might need to do client-side filtering or separate query.
+    // For now, let's fetch all and filter client-side if skill is provided, 
+    // or use array-contains if we remove the 'in' check or use a composite index.
+    // To keep it simple and robust without complex indexes for now:
+    
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => doc.data() as User);
+    let workers = querySnapshot.docs.map(doc => doc.data() as User);
+
+    if (skill) {
+        workers = workers.filter(user => 
+            user.workerProfile?.skills?.some(s => s.toLowerCase().includes(skill.toLowerCase()))
+        );
+    }
+
+    return workers;
 };
 
 // Negotiation Functions

@@ -92,7 +92,7 @@ export default function WorkerProfilePage() {
             </label>
             <textarea
               required
-              className="w-full rounded-lg border-gray-300 focus:border-primary focus:ring-primary min-h-[200px]"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary min-h-[200px]"
               value={formData.bio}
               onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
               placeholder="経歴、得意分野、実績などを詳しく書いてください。"
@@ -115,7 +115,7 @@ export default function WorkerProfilePage() {
               稼働可能時間 <span className="text-red-500">*</span>
             </label>
             <select
-              className="w-full rounded-lg border-gray-300 focus:border-primary focus:ring-primary"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               value={formData.hoursPerWeek}
               onChange={(e) => setFormData({ ...formData, hoursPerWeek: e.target.value })}
             >
