@@ -10,7 +10,7 @@ import { getJobs } from "@/lib/db";
 import { Job } from "@/types";
 
 export default function ClientDashboard() {
-    const { user } = useAuth();
+    const { user, firebaseUser } = useAuth();
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<'all' | 'open' | 'filled' | 'closed'>('all');
@@ -44,7 +44,7 @@ export default function ClientDashboard() {
             <div className="flex justify-between items-center mb-8">
                 <div>
                     <h1 className="text-2xl font-bold text-secondary">ダッシュボード</h1>
-                    <p className="text-gray-600">ようこそ、{user?.displayName}さん</p>
+                    <p className="text-gray-600">ようこそ、{user?.displayName || firebaseUser?.displayName || 'ゲスト'}さん</p>
                 </div>
                 <Link href="/client/jobs/new">
                     <Button className="flex items-center gap-2">

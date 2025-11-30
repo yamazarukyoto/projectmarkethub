@@ -14,7 +14,7 @@ import { Job, Proposal } from "@/types";
 type Application = Proposal & { job?: Job };
 
 export default function WorkerDashboard() {
-    const { user } = useAuth();
+    const { user, firebaseUser } = useAuth();
     const [recentJobs, setRecentJobs] = useState<Job[]>([]);
     const [applications, setApplications] = useState<Application[]>([]);
     const [loading, setLoading] = useState(true);
@@ -71,7 +71,7 @@ export default function WorkerDashboard() {
             <div className="flex justify-between items-center mb-8">
                 <div>
                     <h1 className="text-2xl font-bold text-secondary">ダッシュボード</h1>
-                    <p className="text-gray-600">ようこそ、{user?.displayName}さん</p>
+                    <p className="text-gray-600">ようこそ、{user?.displayName || firebaseUser?.displayName || 'ゲスト'}さん</p>
                 </div>
                 <Link href="/worker/search">
                     <Button className="flex items-center gap-2">

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 
 type Mode = "client" | "worker";
@@ -16,22 +16,31 @@ const ModeContext = createContext<ModeContextType | undefined>(undefined);
 export const ModeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [mode, setModeState] = useState<Mode>("worker");
     const pathname = usePathname();
+    const isInitialized = useRef(false);
 
-    // URLに基づいてモードを自動設定
+    // 初期化時にlocalStorageからモードを読み込む
     useEffect(() => {
+        if (!isInitialized.current) {
+            const savedMode = localStorage.getItem("mode") as Mode;
+            if (savedMode) {
+                setModeState(savedMode);
+            }
+            isInitialized.current = true;
+        }
+    }, []);
+
+    // URLに基づいてモードを自動設定（初期化後のみ）
+    useEffect(() => {
+        if (!isInitialized.current) return;
+        
         if (pathname?.startsWith("/client")) {
             setModeState("client");
             localStorage.setItem("mode", "client");
         } else if (pathname?.startsWith("/worker")) {
             setModeState("worker");
             localStorage.setItem("mode", "worker");
-        } else {
-            // その他のページでは保存されたモードを使用
-            const savedMode = localStorage.getItem("mode") as Mode;
-            if (savedMode) {
-                setModeState(savedMode);
-            }
         }
+        // その他のページでは現在のモードを維持
     }, [pathname]);
 
     const setMode = (newMode: Mode) => {
