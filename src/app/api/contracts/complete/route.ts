@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
     // 7. 金額計算
     const amount = contract?.amount || 0; // 税抜契約金額
     const tax = Math.floor(amount * 0.10);
-    const totalAmount = amount + tax; // クライアント支払総額 (仮払い額)
+    const totalAmount = amount + tax; // クライアント支払総額 (仮決済額)
     
     const platformFeeBase = Math.floor(amount * 0.05);
     const platformFeeTax = Math.floor(platformFeeBase * 0.10);
@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to capture payment" }, { status: 500 });
     }
 
-    // 9. Transfer (送金)
+    // 9. Transfer (報酬の引き渡し)
     const transfer = await createTransfer(
       transferAmount,
       workerStripeAccountId,

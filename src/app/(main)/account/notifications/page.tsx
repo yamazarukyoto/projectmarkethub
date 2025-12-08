@@ -77,7 +77,7 @@ export default function NotificationSettingsPage() {
             <div className="flex items-center justify-between py-4 border-b border-gray-100">
               <div>
                 <h3 className="font-medium text-gray-900">契約・業務連絡</h3>
-                <p className="text-sm text-gray-500">契約締結、仮払い、検収などの重要通知。</p>
+                <p className="text-sm text-gray-500">契約締結、仮決済、検収などの重要通知。</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input 

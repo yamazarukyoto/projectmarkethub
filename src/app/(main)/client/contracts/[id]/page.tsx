@@ -58,7 +58,7 @@ export default function ClientContractDetailPage() {
             
             if (data.skipped) {
                 setContract({ ...contract, status: 'escrow' });
-                alert("仮払い（デモ）が完了しました。");
+                alert("仮決済（デモ）が完了しました。");
                 return;
             }
 
@@ -66,7 +66,7 @@ export default function ClientContractDetailPage() {
             setIsPaymentModalOpen(true);
         } catch (error) {
             console.error("Error creating payment intent:", error);
-            alert("仮払い準備中にエラーが発生しました。");
+            alert("仮決済準備中にエラーが発生しました。");
         } finally {
             setIsProcessing(false);
         }
@@ -155,7 +155,7 @@ export default function ClientContractDetailPage() {
                             }`}>
                             {contract.status === 'completed' ? '完了' :
                                 contract.status === 'in_progress' ? '進行中' :
-                                    contract.status === 'escrow' ? '仮払い待ち' : contract.status}
+                                    contract.status === 'escrow' ? '仮決済待ち' : contract.status}
                         </span>
                     </div>
                 </CardHeader>
@@ -203,8 +203,8 @@ export default function ClientContractDetailPage() {
                                 {contract.status === 'in_progress' && <FileText size={16} className="text-blue-600" />}
                                 {contract.status === 'completed' && <CheckCircle size={16} className="text-green-600" />}
                                 <span>
-                                    {contract.status === 'waiting_for_escrow' ? '仮払い待ち' :
-                                     contract.status === 'escrow' ? '仮払い済み・業務開始待ち' :
+                                    {contract.status === 'waiting_for_escrow' ? '仮決済待ち' :
+                                     contract.status === 'escrow' ? '仮決済済み・業務開始待ち' :
                                      contract.status === 'in_progress' ? '業務進行中' :
                                      contract.status === 'submitted' ? '納品確認待ち' :
                                      contract.status === 'completed' ? '契約完了' : contract.status}
@@ -213,17 +213,17 @@ export default function ClientContractDetailPage() {
                         </div>
                     </div>
 
-                    {/* 仮払いボタン */}
+                    {/* 仮決済ボタン */}
                     {contract.status === 'waiting_for_escrow' && (
                         <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
-                            <h4 className="font-bold text-yellow-900 mb-2">仮払い手続きが必要です</h4>
+                            <h4 className="font-bold text-yellow-900 mb-2">仮決済手続きが必要です</h4>
                             <p className="text-sm text-yellow-800 mb-4">
-                                業務を開始するには、まず仮払い（エスクロー）を行う必要があります。
-                                仮払いが完了すると、ワーカーに業務開始の通知が送られます。
+                                業務を開始するには、まず仮決済（決済予約）を行う必要があります。
+                                仮決済が完了すると、ワーカーに業務開始の通知が送られます。
                             </p>
                             <Button onClick={handleEscrow} disabled={isProcessing} className="bg-accent hover:bg-accent/90 text-white">
                                 <CreditCard size={16} className="mr-2" />
-                                仮払いへ進む
+                                仮決済へ進む
                             </Button>
                         </div>
                     )}
@@ -265,7 +265,7 @@ export default function ClientContractDetailPage() {
                     onSuccess={() => {
                         setIsPaymentModalOpen(false);
                         setContract({ ...contract, status: 'escrow' });
-                        alert("仮払いが完了しました。");
+                        alert("仮決済が完了しました。");
                     }}
                 />
             )}

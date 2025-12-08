@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
-import { User, Shield, Bell, Briefcase, CreditCard } from "lucide-react";
+import { User, Shield, Bell, Briefcase, CreditCard, Lock, UserX, UserCircle, Wallet } from "lucide-react";
 
 export default function AccountLayout({
     children,
@@ -19,6 +19,15 @@ export default function AccountLayout({
                 { href: "/account/profile", label: "基本情報編集", icon: User },
                 { href: "/account/verification", label: "本人確認", icon: Shield },
                 { href: "/account/notifications", label: "通知設定", icon: Bell },
+                { href: "/account/security", label: "メールアドレス・パスワード", icon: Lock },
+                { href: "/account/withdraw", label: "退会申請", icon: UserX },
+            ],
+        },
+        {
+            title: "クライアント設定",
+            items: [
+                { href: "/account/client/profile", label: "クライアントプロフィール", icon: UserCircle },
+                { href: "/account/client/payment", label: "支払い方法", icon: Wallet },
             ],
         },
         {

@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     }
 
     // デモモード判定 (PaymentIntentIDがデモ用の場合、またはStripeキーがない場合)
-    if (paymentIntentId.startsWith("demo_") || !process.env.STRIPE_SECRET_KEY) {
+    if (paymentIntentId.startsWith("demo_") || !process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'dummy_key') {
         console.warn("Demo payment intent detected or Stripe not configured. Skipping capture.");
         
         await contractRef.update({
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to capture payment" }, { status: 500 });
     }
 
-    // 7. Transfer to Worker (本払い)
+    // 7. Transfer to Worker (報酬の引き渡し)
     const workerId = contract?.workerId;
     if (workerId) {
         const workerDoc = await adminDb.collection("users").doc(workerId).get();

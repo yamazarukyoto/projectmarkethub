@@ -1,4 +1,4 @@
-# クラウドソーシングプラットフォーム「Project Market Hub」詳細開発仕様書 (Ver 5.0)
+# クラウドソーシングプラットフォーム「Project Market Hub」詳細開発仕様書 (Ver 5.1)
 
 ## 1. プロジェクト定義 & コアコンセプト
 
@@ -76,8 +76,8 @@
       |     |
       |     +-- Contract Management
       |           +-- Contract Detail (/client/contracts/[id])
-      |                 +-- Payment (Escrow)
-      |                 +-- Acceptance (Transfer)
+      |                 +-- Payment (Payment Reservation)
+      |                 +-- Acceptance (Payment Confirmation)
       |
       +-- [ Worker Mode ] (受注者)
             |
@@ -120,9 +120,10 @@
     | (4) 契約/採用 (Contract/Adopt)      |                                     |
     |------------------------------------>|------------------------------------>|
     |                                     |                                     |
-    | (5) 仮払い (Escrow Payment)         |                                     |
+    | (5) 仮決済 (Payment Reservation)    |                                     |
     |     [CREDIT CARD] --(Charge)------> | [STRIPE HOLDING]                    |
-    |------------------------------------>| (Status: Escrow)                    |
+    |     (Payment Obligation Fulfilled)  | (Agent Receipt / Custody)           |
+    |------------------------------------>|                                     |
     |                                     |------------------------------------>|
     |                                     |      (Notification: Start Work)     |
     |                                     |                                     |
@@ -131,9 +132,9 @@
     |                                     |                                     |
     | (7) 検収 (Acceptance)               |                                     |
     |------------------------------------>|                                     |
-    |                                     | (8) 本払い (Transfer Payment)       |
+    |                                     | (8) 決済確定 (Payment Confirmation) |
     |                                     | [STRIPE HOLDING] --(Transfer)-----> | [BANK ACCOUNT]
-    |                                     | (Status: Completed)                 |
+    |                                     | (Release to Worker)                 |
     |                                     |------------------------------------>|
     |                                     |                                     |
     | (9) 評価 (Review)                   | (9) 評価 (Review)                   |
@@ -142,7 +143,8 @@
 ```
 
 CrowdWorksの仕様に準拠し、以下の3方式を実装する。**時間単価制は採用しない。**
-全てのフローにおいて、**「エスクロー（仮払い）」**が必須であり、ワーカーの報酬未払いリスクを排除する。
+全てのフローにおいて、**「仮決済（決済予約）」**が必須であり、ワーカーの報酬未払いリスクを排除する。
+**法的解釈:** クライアントが仮決済を行った時点で、ワーカーへの支払い義務は履行（完了）したものとみなす。プラットフォームはワーカーからの委託を受けて代金を**代理受領（収納代行）**し、検収完了までその決済を保全する。
 
 ### 2.1 プロジェクト方式（固定報酬制 - Fixed Price）
 最も汎用的な形式。要件定義から納品まで、1対1（または1対多）で進行する。
@@ -151,17 +153,17 @@ CrowdWorksの仕様に準拠し、以下の3方式を実装する。**時間単�
 ```mermaid
 stateDiagram-v2
     [*] --> Negotiation: 応募/相談
-    Negotiation --> WaitingForEscrow: 契約合意
-    WaitingForEscrow --> Escrow: 仮払い完了
-    Escrow --> InProgress: 業務開始
+    Negotiation --> WaitingForPayment: 契約合意
+    WaitingForPayment --> PaymentReserved: 仮決済完了
+    PaymentReserved --> InProgress: 業務開始
     InProgress --> Submitted: 納品報告
     Submitted --> InProgress: 差し戻し(修正依頼)
     Submitted --> Completed: 検収完了
     Completed --> [*]: 評価入力
     
     Negotiation --> Cancelled: 辞退/不成立
-    WaitingForEscrow --> Cancelled: キャンセル
-    Escrow --> Cancelled: キャンセル(返金)
+    WaitingForPayment --> Cancelled: キャンセル
+    PaymentReserved --> Cancelled: キャンセル(決済取消)
     InProgress --> Disputed: トラブル報告
 ```
 
@@ -194,33 +196,33 @@ stateDiagram-v2
             *   **Client:** 「条件変更を提示」「この条件で契約する」ボタン。
             *   **Worker:** 「条件変更を提示」「同意する」ボタン。
 
-**Phase 2: 契約 & 仮払い (Contract & Escrow)**
+**Phase 2: 契約 & 仮決済 (Contract & Payment Reservation)**
 4.  **契約締結 (Client)**
     *   **Page:** `/messages/[roomId]` または `/client/jobs/[id]` (応募者一覧)
     *   **UI:** 応募者一覧の各カードに「プロフィールを見る」リンクを設置。クリックで `/users/[workerId]` へ遷移し、詳細を確認できる。
     *   **Action:** クライアントが最終条件で「契約する」ボタン押下。
     *   **DB:** `contracts` 作成 (`status: 'waiting_for_escrow'`).
     *   **Transition:** 画面は自動的に `/client/contracts/[id]` へ遷移する。
-5.  **仮払い (Client)**
+5.  **仮決済 (Client)**
     *   **Page:** `/client/contracts/[id]`
     *   **UI:**
-        *   `ContractStatus`: 「仮払い待ち」ステータス表示。
+        *   `ContractStatus`: 「仮決済待ち」ステータス表示。
         *   `PaymentCard`: 請求額内訳（契約金額＋消費税）を表示。
-        *   `PaymentButton`: **「仮払いへ進む（Stripe決済）」ボタン**。
+        *   `PaymentButton`: **「仮決済へ進む（Stripe決済）」ボタン**。
             *   **Action:** このボタンをクリックすると、画面中央に `PaymentModal` (Stripe Elements) がオーバーレイ表示される。
             *   **Stripe Flow:**
                 1.  クレジットカード情報を入力。
                 2.  「支払う」ボタン押下。
-                3.  Stripe API `PaymentIntent` (Separate Charges and Transfers) が実行され、プラットフォームが資金を預かる。
-                4.  成功時、モーダルが閉じ、トースト通知「仮払いが完了しました」を表示。
-                5.  画面リロードまたはステータス更新で「業務中（仮払い済み）」表示に切り替わる。
+                3.  Stripe API `PaymentIntent` (Separate Charges and Transfers) が実行され、プラットフォームが代金を代理受領する。
+                4.  成功時、モーダルが閉じ、トースト通知「仮決済が完了しました」を表示。
+                5.  画面リロードまたはステータス更新で「業務中（決済済み）」表示に切り替わる。
     *   **DB:** `contracts.status` → `'escrow'`.
 
 **Phase 3: 業務 & 納品 (Work & Delivery)**
 6.  **業務開始 (Worker)**
     *   **Page:** `/worker/contracts/[id]`
     *   **UI:**
-        *   `ContractStatus`: 「業務中（仮払い済み）」表示。
+        *   `ContractStatus`: 「業務中（決済済み）」表示。
         *   `DeliveryForm`:
             *   ファイルアップロード (Drag & Drop)。
             *   コメント入力エリア。
@@ -229,7 +231,7 @@ stateDiagram-v2
     *   **Action:** 納品報告ボタン押下。
     *   **DB:** `contracts.status` → `'submitted'`.
 
-**Phase 4: 検収 & 支払い (Acceptance & Payment)**
+**Phase 4: 検収 & 決済確定 (Acceptance & Confirmation)**
 8.  **検収 (Client)**
     *   **Page:** `/client/contracts/[id]`
     *   **UI:**
@@ -237,8 +239,8 @@ stateDiagram-v2
         *   `AcceptanceActions`:
             *   `RejectButton`: 「修正依頼（差し戻し）」
                 *   クリックで理由入力モーダル表示 → 送信でステータスを `in_progress` へ戻す。
-            *   `ApproveButton`: **「検収完了（支払い確定）」ボタン**。
-                *   クリックで確認モーダル表示：「検収を完了しますか？これによりワーカーへの支払いが確定します。」
+            *   `ApproveButton`: **「検収完了（決済確定）」ボタン**。
+                *   クリックで確認モーダル表示：「検収を完了しますか？これによりワーカーへの報酬引き渡しが確定します。」
                 *   「確定する」ボタン押下で `/api/contracts/complete` をコール。
     *   **System:** `/api/contracts/complete` (または `/api/stripe/capture-payment-intent`)。
         *   ※現状のコードベースでは `capture-payment-intent` が実装されているが、業務フロー的には `contracts/complete` が適切。
@@ -252,12 +254,12 @@ stateDiagram-v2
 
 ### 2.2 コンペ方式（Competition Format）
 「ロゴ作成」や「ネーミング」など、多数の案から選びたい場合。
-**特徴:** 募集開始時に「仮払い」を行い、採用決定時に「本払い」を行う。
+**特徴:** 募集開始時に「仮決済」を行い、採用決定時に「決済確定」を行う。
 
 #### 状態遷移図
 ```mermaid
 stateDiagram-v2
-    [*] --> Open: 募集開始(仮払い済)
+    [*] --> Open: 募集開始(仮決済済)
     Open --> Selecting: 募集終了
     Selecting --> Closed: 採用決定
     Closed --> [*]: 納品・検収完了
@@ -271,17 +273,17 @@ stateDiagram-v2
         *   `JobTypeSelector`: 「コンペ方式」を選択。
         *   `JobForm`: タイトル、詳細、カテゴリ、**契約金額（予算）**を入力。
         *   `ConfirmButton`: 「確認画面へ進む」ボタン。
-2.  **仮払い & 公開 (Client)**
+2.  **仮決済 & 公開 (Client)**
     *   **Page:** `/client/jobs/new/confirm` (または確認モーダル)
     *   **UI:**
         *   募集内容のプレビュー表示。
         *   `PaymentSection`: 「支払い金額：¥〇〇,〇〇〇（税込）」の表示。
-        *   `PublishButton`: **「仮払いして募集を開始する」ボタン**。
+        *   `PublishButton`: **「仮決済して募集を開始する」ボタン**。
             *   **Action:** クリックで `PaymentModal` (Stripe Elements) が表示される。
             *   **Stripe Flow:**
                 1.  カード情報入力 → 支払い実行。
                 2.  決済成功 (`PaymentIntent` 完了) をトリガーに、`jobs` データを `status: 'open'` で作成。
-    *   **System:** 即時決済。資金はプラットフォームが預かる。
+    *   **System:** 即時決済。代金はプラットフォームが代理受領する。
 3.  **提案 (Worker)**
     *   **Page:** `/worker/jobs/[id]`
     *   **UI:**
@@ -299,24 +301,24 @@ stateDiagram-v2
     *   **UI:**
         *   `DeliveryForm`: 「正式な納品データ（高解像度・透かしなし）」をアップロード。
         *   ※コンペの場合、提案時のデータで良ければスキップも可能だが、トラブル防止のため正式納品フローを挟む。
-6.  **検収 & 本払い (Client)**
+6.  **検収 & 決済確定 (Client)**
     *   **Page:** `/client/contracts/[id]`
     *   **UI:**
         *   `DeliveryCheck`: 正式データを確認。
-        *   `CompleteButton`: **「検収完了（報酬支払い）」ボタン**。
-    *   **System:** Stripe Transfer実行。採用されたワーカーへ送金される。
-    *   **Refund:** 募集期間終了後、採用枠が埋まらなかった場合やキャンセル時は、残額をクライアントへRefundする。
+        *   `CompleteButton`: **「検収完了（報酬引き渡し）」ボタン**。
+    *   **System:** Stripe Transfer実行。採用されたワーカーへ報酬が引き渡される。
+    *   **Refund:** 募集期間終了後、採用枠が埋まらなかった場合やキャンセル時は、残額をクライアントへ決済キャンセル（返金）する。
 
 ---
 
 ### 2.3 タスク方式（Task Format）
 「アンケート」や「データ入力」など、単純作業の大量発注。
-**特徴:** 募集開始時に「総額（単価×件数）」を仮払いし、作業承認ごとに「本払い」を行う。
+**特徴:** 募集開始時に「総額（単価×件数）」を仮決済し、作業承認ごとに「決済確定」を行う。
 
 #### 状態遷移図
 ```mermaid
 stateDiagram-v2
-    [*] --> Open: 募集開始(仮払い済)
+    [*] --> Open: 募集開始(仮決済済)
     Open --> Working: 作業開始(Worker)
     Working --> Pending: 作業提出
     Pending --> Approved: 承認(報酬発生)
@@ -334,11 +336,11 @@ stateDiagram-v2
         *   `TaskBuilder`: 単価、件数、制限時間、設問フォームを作成。
         *   `BudgetPreview`: 合計金額（単価×件数＋消費税）の自動計算表示。
         *   `ConfirmButton`: 「確認画面へ進む」ボタン。
-2.  **仮払い & 公開 (Client)**
+2.  **仮決済 & 公開 (Client)**
     *   **Page:** `/client/jobs/new/confirm`
     *   **UI:**
         *   タスク内容と合計金額の確認。
-        *   `PublishButton`: **「仮払いして募集を開始する」ボタン**。
+        *   `PublishButton`: **「仮決済して募集を開始する」ボタン**。
             *   **Action:** クリックで `PaymentModal` (Stripe Elements) が表示される。
             *   **Stripe Flow:**
                 1.  総額を決済 (`PaymentIntent`)。
@@ -349,29 +351,33 @@ stateDiagram-v2
         *   `StartButton`: 「作業を開始する」ボタン。
             *   クリックで作業画面へ遷移（`task_submissions` 作成、在庫確保）。
         *   `TaskWorkspace`: 制限時間内に回答を入力し、「作業を完了して提出する」ボタン押下。
-4.  **承認 & 本払い (Client)**
+4.  **承認 & 決済確定 (Client)**
     *   **Page:** `/client/jobs/[id]` (タスク管理タブ)
     *   **UI:**
         *   `SubmissionList`: 提出された作業の一覧。
         *   `ApproveButton`: 各行の**「承認」ボタン**。
-            *   **Action:** クリックすると即座にその作業分の報酬（単価）がワーカーへ支払われる。
+            *   **Action:** クリックすると即座にその作業分の報酬（単価）がワーカーへ引き渡される。
             *   **System:** `/api/tasks/approve` → Stripe Transfer実行（単価分のみ）。
         *   `RejectButton`: 「非承認」ボタン（理由入力必須）。報酬は支払われない。
-5.  **完了 & 返金 (System)**
+5.  **完了 & 決済キャンセル (System)**
     *   **Trigger:** 募集期間終了、または全件承認完了。
     *   **System:** 未消化分の予算（非承認分や応募不足分）がある場合、クライアントへ `Refund` 処理を行う。
 
 ---
 
-## 2.4 決済・仮払い詳細仕様 (Payment & Escrow Deep Dive)
+## 2.4 決済・収納代行詳細仕様 (Payment & Agency Receipt Deep Dive)
 
 本プラットフォームの核となる決済システムは、**Stripe Connect (Separate Charges and Transfers)** モデルを採用する。
-これは、クライアントからの支払いを一度プラットフォームが受け取り（仮払い）、検収完了後にワーカーへ送金（本払い）する方式である。
+法的には、プラットフォームはワーカーから「代理受領権」を付与され、クライアントからの報酬支払いを**収納代行**する。
 
-### 採用理由とメリット
-1.  **長期案件への対応:** 通常のオーソリ（`capture_method: manual`）は7日間で期限切れとなるため、数週間〜数ヶ月に及ぶプロジェクト方式には不向きである。一度決済を完了させプラットフォーム残高として保持することで、期間の制限なくエスクロー状態を維持できる。
-2.  **柔軟な送金先:** コンペやタスク方式では、仮払い時点でワーカー（送金先）が未定である。プラットフォーム預かりとすることで、後から決定したワーカーへ送金が可能となる。
-3.  **分割送金:** タスク方式のように、1つの仮払い（Charge）に対して複数のワーカーへ分割して送金（Transfer）することが可能。
+### 採用理由と法的解釈
+1.  **収納代行（代理受領）モデル:**
+    *   クライアントがプラットフォームに対して決済（仮決済）を行った時点で、クライアントのワーカーに対する支払い義務は消滅（履行完了）する。
+    *   プラットフォームは、ワーカーに代わって代金を受領し、検収完了までその資金を管理（保全）する。
+    *   検収完了後、プラットフォームからワーカーへ報酬を引き渡す（Stripe Transfer）。
+    *   これにより、資金決済法上の「資金移動業」には該当せず、商取引の決済代行として適法に運用する。
+2.  **長期案件への対応:** 通常のオーソリ（`capture_method: manual`）は7日間で期限切れとなるため、数週間〜数ヶ月に及ぶプロジェクト方式には不向きである。一度決済を完了させプラットフォーム管理下の資金として保持することで、期間の制限なく決済保全状態を維持できる。
+3.  **柔軟な送金先:** コンペやタスク方式では、仮決済時点でワーカー（送金先）が未定である。プラットフォーム代理受領とすることで、後から決定したワーカーへ報酬引き渡しが可能となる。
 
 ### 金額計算シミュレーション (Financial Calculation)
 
@@ -384,11 +390,11 @@ stateDiagram-v2
 | :--- | :--- | :--- | :--- |
 | **A. 契約金額 (税抜)** | User Input | **10,000 円** | |
 | **B. 消費税 (10%)** | `A * 0.10` | 1,000 円 | |
-| **C. クライアント支払総額** | `A + B` | **11,000 円** | **仮払い金額 (Charge Amount)** |
+| **C. クライアント支払総額** | `A + B` | **11,000 円** | **仮決済金額 (Charge Amount)** |
 | **D. システム手数料 (税抜)** | `A * 0.05` | 500 円 | プラットフォーム収益 |
 | **E. 手数料の消費税** | `D * 0.10` | 50 円 | |
 | **F. システム手数料 (税込)** | `D + E` | 550 円 | |
-| **G. ワーカー受取額** | `C - F` | **10,450 円** | **本払い金額 (Transfer Amount)** |
+| **G. ワーカー受取額** | `C - F` | **10,450 円** | **報酬引渡金額 (Transfer Amount)** |
 
 **検証:**
 *   ワーカー視点: 10,000円(税抜)の仕事をして、11,000円(税込)を受け取る権利があるが、そこから手数料550円(税込)が引かれる。
@@ -396,12 +402,12 @@ stateDiagram-v2
 
 ### Stripe API 実装詳細
 
-#### 1. 仮払い (Charge / PaymentIntent)
+#### 1. 仮決済 (Charge / PaymentIntent)
 クライアントが支払うフェーズ。
 
 *   **API:** `stripe.paymentIntents.create`
 *   **タイミング:**
-    *   **プロジェクト:** 契約締結後、クライアントが「仮払い」ボタンを押した時。
+    *   **プロジェクト:** 契約締結後、クライアントが「仮決済」ボタンを押した時。
     *   **コンペ/タスク:** 募集作成の最終確認画面で「公開」ボタンを押した時。
 *   **パラメータ:**
     ```javascript
@@ -413,7 +419,7 @@ stateDiagram-v2
       metadata: {
         jobId: '{jobId}',
         contractId: '{contractId}', // プロジェクト方式の場合
-        type: 'escrow'
+        type: 'escrow' // システム内部識別子としてのescrow（法的には収納代行）
       }
     }
     ```
@@ -421,8 +427,8 @@ stateDiagram-v2
     *   `PaymentModal` (Stripe Elements) を表示。
     *   決済成功時、DBのステータスを更新 (`waiting_for_escrow` -> `escrow` / `open`)。
 
-#### 2. 本払い (Transfer)
-ワーカーへ報酬を移動するフェーズ。
+#### 2. 決済確定・報酬引渡 (Transfer)
+ワーカーへ報酬を引き渡すフェーズ。
 
 *   **API:** `stripe.transfers.create`
 *   **タイミング:**
@@ -438,7 +444,7 @@ stateDiagram-v2
       amount: 10450, // G. ワーカー受取額
       currency: 'jpy',
       destination: '{workerStripeAccountId}', // ワーカーのConnect Account ID
-      transfer_group: '{jobId}', // 仮払いと同じグループIDを指定
+      transfer_group: '{jobId}', // 仮決済と同じグループIDを指定
       metadata: {
         jobId: '{jobId}',
         contractId: '{contractId}',
@@ -450,7 +456,7 @@ stateDiagram-v2
     *   処理中はローディングスピナーを表示（二重送信防止）。
     *   完了後、トースト通知「支払いが完了しました」を表示し、画面をリロードまたはステータス更新。
 
-#### 3. 返金 (Refund)
+#### 3. 決済キャンセル (Refund)
 キャンセルや余剰予算の返還フェーズ。
 
 *   **API:** `stripe.refunds.create`
@@ -461,7 +467,7 @@ stateDiagram-v2
 *   **パラメータ:**
     ```javascript
     {
-      payment_intent: '{paymentIntentId}', // 仮払い時のID
+      payment_intent: '{paymentIntentId}', // 仮決済時のID
       amount: 5500, // 返金する金額（全額または一部）
       metadata: {
         jobId: '{jobId}',
@@ -475,7 +481,7 @@ stateDiagram-v2
 1.  **決済失敗 (Card Error):**
     *   **原因:** 限度額オーバー、有効期限切れ、不正利用検知など。
     *   **UI:** Stripe Elementsが自動的にエラーメッセージを表示する。クライアントには別のカードでの試行を促す。
-    *   **System:** DBの状態は変更しない（仮払い待ちのまま）。
+    *   **System:** DBの状態は変更しない（仮決済待ちのまま）。
 
 2.  **送金失敗 (Transfer Error):**
     *   **原因:** ワーカーのStripeアカウント制限、本人確認未完了、プラットフォーム残高不足。
@@ -491,12 +497,12 @@ stateDiagram-v2
 ### 各方式における詳細フローとステータス遷移
 
 #### A. プロジェクト方式（固定報酬）
-1.  **仮払い:** 契約 (`contracts`) ごとに `PaymentIntent` を作成。
+1.  **仮決済:** 契約 (`contracts`) ごとに `PaymentIntent` を作成。
     *   Status: `waiting_for_escrow` -> `escrow`
-    *   **Guard:** 仮払い完了まで、ワーカー側の「納品する」ボタンは **Disabled (非活性)** とする。
+    *   **Guard:** 仮決済完了まで、ワーカー側の「納品する」ボタンは **Disabled (非活性)** とする。
 2.  **業務・納品:** ワーカーが納品。
     *   Status: `escrow` -> `submitted`
-3.  **検収・本払い:** クライアントが検収。`Transfer` を実行。
+3.  **検収・決済確定:** クライアントが検収。`Transfer` を実行。
     *   Status: `submitted` -> `completed`
     *   **Guard:** 検収完了後、クライアントは返金を要求できない（Stripe上もRefund不可とする）。
 4.  **キャンセル:**
@@ -506,32 +512,32 @@ stateDiagram-v2
     *   **Guard:** ワーカーが「納品済み」の場合、クライアント単独でのキャンセルは不可（ワーカーの合意アクションが必要）。
 
 #### B. コンペ方式
-1.  **仮払い:** 募集 (`jobs`) 作成時に予算全額を `PaymentIntent` で決済。
+1.  **仮決済:** 募集 (`jobs`) 作成時に予算全額を `PaymentIntent` で決済。
     *   Status: `draft` -> `open`
 2.  **選定:** 募集終了後、採用作品を決定。
     *   Status: `open` -> `selecting`
 3.  **採用・納品:** 採用ワーカーと契約作成。納品データを提出。
     *   Contract Status: `waiting_for_delivery` -> `submitted`
     *   **Guard:** 採用決定ボタン押下時、確認モーダルで「採用により契約が成立し、支払い義務が発生します」と明示。
-4.  **検収・本払い:** 納品データ確認後、採用ワーカーへ `Transfer`。
+4.  **検収・決済確定:** 納品データ確認後、採用ワーカーへ `Transfer`。
     *   Contract Status: `submitted` -> `completed`
     *   Job Status: `selecting` -> `closed`
 5.  **返金:**
-    *   募集終了時、`仮払い額 - 送金済み総額` を計算し、残額があれば自動的に `Refund` 処理を行うバッチを実行。
+    *   募集終了時、`仮決済額 - 送金済み総額` を計算し、残額があれば自動的に `Refund` 処理を行うバッチを実行。
 
 #### C. タスク方式
-1.  **仮払い:** 募集 (`jobs`) 作成時に `単価 × 件数` の総額を `PaymentIntent` で決済。
+1.  **仮決済:** 募集 (`jobs`) 作成時に `単価 × 件数` の総額を `PaymentIntent` で決済。
     *   Status: `draft` -> `open`
 2.  **作業:** ワーカーが作業提出。
     *   Submission Status: `working` -> `pending`
     *   **Guard:** 同一ワーカーによる連続投稿制限（短時間の大量投稿はBotの可能性があるため、reCAPTCHA等で対策）。
-3.  **承認・本払い:**
+3.  **承認・決済確定:**
     *   クライアントが1件承認するごとに、その作業のワーカーへ `単価` 分を `Transfer`。
     *   即時性が求められるため、承認ボタン押下時に同期的にAPIをコールする。
     *   Submission Status: `pending` -> `approved`
     *   **Guard:** 一度「承認」した作業は取り消し不可。
 4.  **返金:**
-    *   募集終了時、またはクライアントによる早期終了時、`仮払い額 - 承認済み総額` を計算し、残額を `Refund`。
+    *   募集終了時、またはクライアントによる早期終了時、`仮決済額 - 承認済み総額` を計算し、残額を `Refund`。
     *   Job Status: `open` -> `closed`
 
 ---
@@ -546,11 +552,11 @@ stateDiagram-v2
     *   **NGワード検知:** メッセージ内で「メールアドレス」「電話番号」「LINE ID」「@」などのパターンを検知し、送信前に警告モーダルを表示。「外部連絡先の交換は規約違反です」と警告する。
     *   **監視:** 検知されたメッセージは管理画面でフラグを立て、運営が目視確認できるようにする。
 
-### 2. 仮払い前の業務強要（持ち逃げ）防止
+### 2. 仮決済前の業務強要（持ち逃げ）防止
 *   **リスク:** クライアントが「後で払うから」と作業をさせ、納品物だけ受け取って支払わない。
 *   **対策:**
-    *   **システム制御:** ステータスが `escrow` (仮払い済み) になるまで、ワーカー側の画面には「納品フォーム」を表示しない（または非活性化）。
-    *   **UI警告:** チャット画面や契約詳細画面に「仮払いが完了するまで、絶対に業務を開始しないでください」という警告帯を常時表示する。
+    *   **システム制御:** ステータスが `escrow` (仮決済済み) になるまで、ワーカー側の画面には「納品フォーム」を表示しない（または非活性化）。
+    *   **UI警告:** チャット画面や契約詳細画面に「仮決済が完了するまで、絶対に業務を開始しないでください」という警告帯を常時表示する。
 
 ### 3. 納品データの持ち逃げ防止
 *   **リスク:** クライアントが納品ファイルをダウンロードした後、不当に検収を拒否・キャンセルする。
@@ -595,8 +601,8 @@ stateDiagram-v2
 ### 4. システムメッセージ (System Messages)
 *   **定義:** ユーザーが入力したテキストではなく、システムが自動投稿する通知メッセージ。
 *   **トリガー:**
-    *   契約締結時：「契約が締結されました。仮払いをお待ちください。」
-    *   仮払い完了時：「仮払いが完了しました。業務を開始してください。」
+    *   契約締結時：「契約が締結されました。仮決済をお待ちください。」
+    *   仮決済完了時：「仮決済が完了しました。業務を開始してください。」
     *   納品時：「ワーカーから納品報告がありました。検収を行ってください。」
     *   検収完了時：「検収が完了しました。お疲れ様でした。」
 *   **表示:** 通常のメッセージとは異なるスタイル（背景色変更、中央寄せ等）で表示し、区別する。
@@ -643,8 +649,8 @@ stateDiagram-v2
 | フェーズ | キャンセル可否 | 手数料・返金 | 備考 |
 | :--- | :--- | :--- | :--- |
 | **契約前** | 自由 | 発生しない | 応募辞退、募集取り下げは自由。 |
-| **契約後・仮払い前** | 可能 | 発生しない | 相手へのメッセージ通知必須。自動キャンセル機能あり（1週間放置等）。 |
-| **仮払い後・業務開始前** | 可能 | **全額返金** | クライアント・ワーカー双方の合意が必要。システム手数料も返還される（Stripe仕様に準拠）。 |
+| **契約後・仮決済前** | 可能 | 発生しない | 相手へのメッセージ通知必須。自動キャンセル機能あり（1週間放置等）。 |
+| **仮決済後・業務開始前** | 可能 | **全額返金** | クライアント・ワーカー双方の合意が必要。システム手数料も返還される（Stripe仕様に準拠）。 |
 | **業務開始後・納品前** | 条件付き可能 | **部分返金** | 進捗に応じた金額をワーカーへ支払い、残額を返金。**システム手数料は「支払い額」に対してのみ発生**。 |
 | **納品後・検収前** | **原則不可** | - | 成果物が完成しているため、一方的なキャンセルは不可。品質に問題がある場合は「修正依頼」を行う。どうしても合意に至らない場合は運営介入。 |
 | **検収完了後** | **不可** | - | 決済確定後のキャンセル・返金はシステム上行わない。当事者間で解決する。 |
@@ -689,7 +695,7 @@ Cloud Functions for Firebase (Pub/Sub Scheduler) を利用した定期実行処�
 ### 1. 募集期限切れチェック (Daily)
 *   **対象:** `status: 'open'` かつ `deadline < now` の案件。
 *   **処理:** ステータスを `closed` (募集終了) に更新し、クライアントへ通知メールを送信。
-*   **返金:** コンペ・タスク方式で仮払い済みの予算がある場合、自動的に `Refund` 処理を実行。
+*   **返金:** コンペ・タスク方式で仮決済済みの予算がある場合、自動的に `Refund` 処理を実行。
 
 ### 2. 自動検収処理 (Daily)
 *   **対象:** `status: 'submitted'` (納品済み) かつ `submittedAt < 14 days ago` の契約。
@@ -808,7 +814,7 @@ CrowdWorksのマイページ構成をベースに、本プラットフォーム�
 | :--- | :---: | :--- |
 | **重要なお知らせ** | ON (固定) | 運営からの重要連絡。OFF不可。 |
 | **メッセージ受信** | ON | クライアント/ワーカーからのメッセージ。 |
-| **契約・業務連絡** | ON | 契約締結、仮払い、検収等の通知。 |
+| **契約・業務連絡** | ON | 契約締結、仮決済、検収等の通知。 |
 | **スカウトメール** | ON | クライアントからのスカウト。 |
 | **デイリーサマリー** | OFF | おすすめ案件などのまとめメール。 |
 
@@ -998,8 +1004,8 @@ interface Contract {
   
   // Status
   status: 
-    | 'waiting_for_escrow' // 仮払い待ち
-    | 'escrow'             // 仮払い済み・作業待ち
+    | 'waiting_for_escrow' // 仮決済待ち
+    | 'escrow'             // 仮決済済み・作業待ち
     | 'in_progress'        // 作業中（修正対応含む）
     | 'submitted'          // 納品確認中
     | 'disputed'           // トラブル中
@@ -1067,7 +1073,7 @@ interface TaskSubmission {
 *   **Webhook:** Stripeからのイベント (`payment_intent.succeeded`, `payment_intent.payment_failed`) をCloud Functionsで受け取り、DB整合性を保つ（バックアップ手段として）。基本はクライアントサイドからのAPIコールで状態遷移させるが、Webhookは必須。
 
 ### 5.4 通知システム (Notifications)
-*   **Trigger:** 状態遷移時（応募、契約、仮払い、納品、検収）。
+*   **Trigger:** 状態遷移時（応募、契約、仮決済、納品、検収）。
 *   **Channel:**
     1.  **In-App:** ヘッダーのベルアイコン。`notifications` コレクションに書き込み。
     2.  **Email:** SendGrid または Firebase Extensions (Trigger Email) を使用してメール送信。
@@ -1146,7 +1152,7 @@ Firestore Security Rulesの概要。
 | **販売価格** | 各商品・サービスのご購入ページにて表示する価格 |
 | **商品代金以外の必要料金** | インターネット接続料金、通信料金等はお客様の負担となります。 |
 | **支払方法** | クレジットカード決済 (Stripe)、銀行振込 |
-| **支払時期** | **固定報酬制:** 契約締結時に仮払い（与信枠確保）、検収完了時に決済確定。<br>**タスク方式:** 募集開始時に仮払い、承認完了時に決済確定。<br>**コンペ方式:** 募集開始時に仮払い、採用決定時に決済確定。 |
+| **支払時期** | **固定報酬制:** 契約締結時に決済予約（与信確保）を行い、検収完了時に決済確定。<br>**タスク方式:** 募集開始時に決済予約、承認完了時に決済確定。<br>**コンペ方式:** 募集開始時に決済予約、採用決定時に決済確定。 |
 | **引渡し時期** | 決済完了後、即時（サービス利用開始） |
 | **返品・交換・キャンセル** | デジタルコンテンツの性質上、原則として返品・返金には応じられません。<br>ただし、当社の責めに帰すべき事由によりサービスが提供されなかった場合はこの限りではありません。<br>契約キャンセル時の返金については利用規約に準じます。 |
 
@@ -1168,7 +1174,7 @@ Firestore Security Rulesの概要。
 3. **「クライアント」**: 本サービスを通じて業務を依頼するユーザー。
 4. **「ワーカー」**: 本サービスを通じて業務を受託するユーザー。
 5. **「本取引」**: 本サービスを通じてクライアントとワーカーの間で締結される業務委託契約。
-6. **「仮払い」**: クライアントがワーカーに対する報酬を、運営者が指定する決済サービスを通じて一時的に預け入れること。
+6. **「仮決済（決済予約）」**: クライアントがワーカーに対する報酬の支払いを確約するために、運営者が指定する決済サービスを通じて与信枠の確保または決済予約を行うこと。
 
 ### 第3条 (利用登録)
 1. 登録希望者が運営者の定める方法によって利用登録を申請し、運営者がこれを承認することによって、利用登録が完了するものとします。
@@ -1218,8 +1224,11 @@ Firestore Security Rulesの概要。
     *   その他、運営者が本サービスの利用を適当でないと判断した場合
 2. 運営者は、本条に基づき運営者が行った行為によりユーザーに生じた損害について、一切の責任を負いません。
 
-### 第8条 (退会)
-ユーザーは、運営者の定める退会手続により、本サービスから退会できるものとします。ただし、未完了の取引（仮払い中の案件、検収待ちの案件等）がある場合は、それらが完了するまで退会できません。
+### 第8条 (決済および収納代行)
+1. **代理受領権の付与:** ワーカーは、本サービスを利用して報酬を受け取るにあたり、運営者に対して、クライアントから支払われる報酬を代理して受領する権限（代理受領権）を付与するものとします。
+2. **債務の消滅:** クライアントが運営者に対して報酬相当額の決済（仮決済を含む）を行った時点で、クライアントのワーカーに対する報酬支払債務は消滅し、履行が完了したものとみなします。
+3. **収納代行:** 運営者は、ワーカーからの委託に基づき、クライアントからの報酬を収納代行（代理受領）し、検収完了等の条件が成就した後に、所定の手数料を控除した金額をワーカーへ引き渡します。
+4. **資金移動業の否定:** 本サービスにおける資金の流れは、商取引に基づく代金の収納代行であり、資金決済法上の「資金移動業」には該当しません。運営者は、ユーザー間の送金サービスを提供するものではありません。
 
 ### 第9条 (保証の否認および免責事項)
 1. 運営者は、本サービスに事実上または法律上の瑕疵（安全性、信頼性、正確性、完全性、有効性、特定の目的への適合性、セキュリティなどに関する欠陥、エラーやバグ、権利侵害などを含みます。）がないことを明示的にも黙示的にも保証しておりません。
@@ -1307,3 +1316,73 @@ Project Market Hub運営事務局（以下「当運営」といいます。）�
 *   メールアドレス: service@meeting-agency.com
 
 以上
+
+---
+
+## 11. 開発環境・インフラ設定 (Infrastructure Configuration)
+
+### 11.1 Firebase プロジェクト設定
+
+**使用プロジェクト:** `projectmarkethub-db904`
+
+| 設定項目 | 値 |
+| :--- | :--- |
+| **Project ID** | `projectmarkethub-db904` |
+| **Project Number** | `173689610587` |
+| **API Key** | `AIzaSyD6uAWaLZ6hHgYZpvRrcCKGOZRGWi3ruNU` |
+| **Auth Domain** | `projectmarkethub-db904.firebaseapp.com` |
+| **Storage Bucket** | `projectmarkethub-db904.firebasestorage.app` |
+| **Messaging Sender ID** | `173689610587` |
+| **App ID** | `1:173689610587:web:ea5e28f0e2e65e6cb43a7e` |
+
+**承認済みドメイン:**
+- `localhost`
+- `projectmarkethub-db904.firebaseapp.com`
+- `projectmarkethub-db904.web.app`
+- `projectmarkethub.web.app`
+- `projectmarkethub.firebaseapp.com`
+- `project-market-hub.com`
+
+### 11.2 認証プロバイダー設定
+
+| プロバイダー | 状態 | 備考 |
+| :--- | :---: | :--- |
+| **メール/パスワード** | ✅ 有効 | 標準認証 |
+| **Google** | ✅ 有効 | OAuth 2.0 Client ID設定済み |
+
+**Google OAuth設定:**
+- Client ID: `173689610587-sv8mhtl7f8pccj65s0jlodkfaspm01g0.apps.googleusercontent.com`
+
+### 11.3 Cloud Run デプロイ設定
+
+| 設定項目 | 値 |
+| :--- | :--- |
+| **Service Name** | `projectmarkethub` |
+| **Region** | `asia-northeast1` |
+| **Image Repository** | `asia-northeast1-docker.pkg.dev/projectmarkethub/projectmarkethub-repo/app` |
+| **Service URL** | `https://projectmarkethub-700356537492.asia-northeast1.run.app` |
+| **Custom Domain** | `https://project-market-hub.com` |
+
+### 11.4 環境変数 (.env.local)
+
+```bash
+# Stripe Configuration
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_SECRET_KEY=sk_test_...
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+NEXT_PUBLIC_BASE_URL=https://project-market-hub.com
+
+# Firebase Configuration (projectmarkethub-db904)
+NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyD6uAWaLZ6hHgYZpvRrcCKGOZRGWi3ruNU
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=projectmarkethub-db904.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=projectmarkethub-db904
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=projectmarkethub-db904.firebasestorage.app
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=173689610587
+NEXT_PUBLIC_FIREBASE_APP_ID=1:173689610587:web:ea5e28f0e2e65e6cb43a7e
+```
+
+### 11.5 変更履歴
+
+| 日付 | 変更内容 |
+| :--- | :--- |
+| 2025-12-08 | Firebaseプロジェクトを`projectmarkethub`から`projectmarkethub-db904`に統合。旧プロジェクト`projectmarkethub`(700356537492)は削除済み。Google認証設定を完了。 |

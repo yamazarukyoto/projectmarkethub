@@ -55,7 +55,7 @@ export default function Home() {
                                 </div>
                                 <h3 className="text-xl font-bold mb-4">安心の決済システム</h3>
                                 <p className="text-gray-600">
-                                    仮払いシステムにより、報酬の未払いや納品トラブルを防ぎます。Stripe決済で安全に取引できます。
+                                    仮決済（決済予約）システムにより、報酬の未払いや納品トラブルを防ぎます。Stripe決済で安全に取引できます。
                                 </p>
                             </div>
                             <div className="p-8 rounded-xl bg-gray-50 border border-gray-100 hover:shadow-lg transition-shadow">

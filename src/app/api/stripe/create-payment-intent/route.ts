@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     let targetRef = null;
 
     if (contractId) {
-        // --- プロジェクト方式（契約後の仮払い） ---
+        // --- プロジェクト方式（契約後の仮決済） ---
         const contractDoc = await adminDb.collection("contracts").doc(contractId).get();
         if (!contractDoc.exists) {
             return NextResponse.json({ error: "Contract not found" }, { status: 404 });
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
         targetRef = adminDb.collection("contracts").doc(contractId);
 
     } else if (jobId) {
-        // --- コンペ・タスク方式（募集時の仮払い） ---
+        // --- コンペ・タスク方式（募集時の仮決済） ---
         const jobDoc = await adminDb.collection("jobs").doc(jobId).get();
         if (!jobDoc.exists) {
             return NextResponse.json({ error: "Job not found" }, { status: 404 });
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
         // 本来は消費税計算が必要
         amount = job?.budget || reqAmount; 
         
-        // ワーカー未定のため transfer_data は設定しない（プラットフォーム預かり）
+        // ワーカー未定のため transfer_data は設定しない（プラットフォーム収納代行）
         // 手数料は後で Transfer 時に徴収するため、ここでは設定しないか、
         // あるいは全額プラットフォームに入金されるので問題ない。
         
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
 
     // Stripeが無効またはワーカーが未連携(契約時)の場合のデモ動作
     // コンペ・タスクの場合はワーカーID不要
-    if (!process.env.STRIPE_SECRET_KEY || (contractId && !workerStripeAccountId)) {
+    if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'dummy_key' || (contractId && !workerStripeAccountId)) {
       console.warn("Stripe is not configured or worker has no account. Skipping payment for demo.");
       
       if (contractId) {
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
     const paymentIntentParams: import("stripe").Stripe.PaymentIntentCreateParams = {
       amount: amount,
       currency: "jpy",
-      capture_method: "manual", // 仮払い
+      capture_method: "manual", // 仮決済
       metadata: metadata,
     };
 

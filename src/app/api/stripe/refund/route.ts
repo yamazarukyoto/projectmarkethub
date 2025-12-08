@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 7. DB更新 (ステータスキャンセル)
-    // 全額返金の場合はキャンセル扱い、部分返金の場合は状況によるが、ここではキャンセルとする
+    // 全額決済キャンセルの場合はキャンセル扱い、部分決済キャンセルの場合は状況によるが、ここではキャンセルとする
     await contractRef.update({
       status: "cancelled",
       stripeRefundId: refund.id,

@@ -4,15 +4,18 @@ import { db } from "@/lib/firebase";
 import { doc, updateDoc } from "firebase/firestore";
 
 export async function POST(req: Request) {
+    let userId: string | null = null;
+    
     try {
-        const { userId } = await req.json();
+        const body = await req.json();
+        userId = body.userId;
 
         if (!userId) {
             return NextResponse.json({ error: "User ID is required" }, { status: 400 });
         }
 
         // Stripeが無効な場合のデモ動作
-        if (!process.env.STRIPE_SECRET_KEY) {
+        if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'dummy_key') {
             console.warn("Stripe is not configured. Simulating Connect flow.");
             
             // デモ用IDを保存
@@ -52,14 +55,10 @@ export async function POST(req: Request) {
         return NextResponse.json({ url: accountLink.url });
     } catch (error) {
         console.error("Stripe Connect Error:", error);
-        // エラー時もデモとして通す場合のフォールバック
-        if (!process.env.STRIPE_SECRET_KEY) { // Double check or just fallback
-             // ...
-        }
         
         // Fallback to demo if Stripe fails
         console.warn("Stripe Connect failed, falling back to demo.");
-        const { userId } = await req.json().catch(() => ({ userId: null }));
+        
         if (userId) {
              await updateDoc(doc(db, "users", userId), {
                 stripeAccountId: "acct_demo_fallback_" + Date.now(),

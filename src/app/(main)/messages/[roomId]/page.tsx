@@ -201,7 +201,7 @@ export default function MessageRoomPage() {
                                         この条件で契約する
                                     </Button>
                                     <p className="text-xs text-gray-500 mt-2 text-center">
-                                        契約を作成し、仮払いへ進みます。
+                                        契約を作成し、仮決済へ進みます。
                                     </p>
                                 </div>
                             )}

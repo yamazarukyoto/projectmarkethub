@@ -84,17 +84,17 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true, skipped: true });
     }
 
-    // 9. Transfer (送金)
+    // 9. Transfer (報酬の引き渡し)
     // タスク方式の場合、募集時にPaymentIntentを作成しており、transfer_group = jobId となっているはず。
-    // ここではそのグループに対して送金する。
+    // ここではそのグループに対して報酬を引き渡す。
     // 注意: PaymentIntentのCaptureは募集時に完了しているか、あるいはここでCaptureが必要か？
-    // 仕様では「募集開始時に仮払い（PaymentIntent作成）」とある。
+    // 仕様では「募集開始時に仮決済（PaymentIntent作成）」とある。
     // capture_method: 'manual' の場合、Captureが必要。
     // タスク方式の場合、全額を最初にCaptureしておくのが一般的（予算確保）。
     // もしCaptureしていなければ、ここでCaptureが必要だが、PaymentIntentは1つなので、
     // 最初の承認時に全額Captureするか、あるいは募集開始時にCaptureしておくべき。
-    // ★sekkei.mdには「募集開始時に仮払い」とあるが、Captureのタイミングは明記されていない。
-    // 通常、タスク方式は「仮払い＝決済確定（預かり）」なので、募集開始時にCaptureすべき。
+    // ★sekkei.mdには「募集開始時に仮決済」とあるが、Captureのタイミングは明記されていない。
+    // 通常、タスク方式は「仮決済＝決済確定（収納代行）」なので、募集開始時にCaptureすべき。
     // しかし、create-payment-intentは manual capture で作成している。
     // ここでは、もし未CaptureならCaptureするロジックを入れるか、あるいは
     // 募集開始時にCaptureするように変更すべきだが、今回は「承認時にTransfer」に集中する。

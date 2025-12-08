@@ -236,7 +236,7 @@ export default function PostJobPage() {
                 alert("依頼を投稿しました！");
                 router.push("/client/dashboard");
             } else {
-                // コンペ・タスクの場合は仮払いへ
+                // コンペ・タスクの場合は仮決済へ
                 setCreatedJobId(jobId);
                 await handlePayment(jobId, jobData.budget);
             }
@@ -263,7 +263,7 @@ export default function PostJobPage() {
             if (data.error) throw new Error(data.error);
 
             if (data.skipped) {
-                alert("仮払い（デモ）が完了し、募集を開始しました！");
+                alert("仮決済（デモ）が完了し、募集を開始しました！");
                 router.push("/client/dashboard");
                 return;
             }
@@ -272,7 +272,7 @@ export default function PostJobPage() {
             setIsPaymentModalOpen(true);
         } catch (error) {
             console.error("Error creating payment intent:", error);
-            alert("仮払い準備中にエラーが発生しました。");
+            alert("仮決済準備中にエラーが発生しました。");
         }
     };
 
@@ -506,7 +506,7 @@ export default function PostJobPage() {
                     clientSecret={clientSecret}
                     onSuccess={() => {
                         setIsPaymentModalOpen(false);
-                        alert("仮払いが完了し、募集を開始しました！");
+                        alert("仮決済が完了し、募集を開始しました！");
                         router.push("/client/dashboard");
                     }}
                 />
@@ -573,10 +573,10 @@ export default function PostJobPage() {
                                             <span>{Math.floor((pendingJobData.budget || 0) * 0.1).toLocaleString()} 円</span>
                                         </div>
                                         <div className="flex justify-between font-bold text-lg border-t pt-2 mt-2">
-                                            <span>合計（仮払い金額）</span>
+                                            <span>合計（仮決済金額）</span>
                                             <span>{Math.floor((pendingJobData.budget || 0) * 1.1).toLocaleString()} 円</span>
                                         </div>
-                                        <p className="text-xs text-gray-500 mt-2">※コンペ方式の場合、募集開始時に仮払いが必要です。</p>
+                                        <p className="text-xs text-gray-500 mt-2">※コンペ方式の場合、募集開始時に仮決済が必要です。</p>
                                     </div>
                                 ) : (
                                     <div className="space-y-1">
@@ -589,10 +589,10 @@ export default function PostJobPage() {
                                             <span>{Math.floor(((pendingJobData.taskUnitPrice || 0) * (pendingJobData.taskQuantity || 0)) * 0.1).toLocaleString()} 円</span>
                                         </div>
                                         <div className="flex justify-between font-bold text-lg border-t pt-2 mt-2">
-                                            <span>合計（仮払い金額）</span>
+                                            <span>合計（仮決済金額）</span>
                                             <span>{Math.floor(((pendingJobData.taskUnitPrice || 0) * (pendingJobData.taskQuantity || 0)) * 1.1).toLocaleString()} 円</span>
                                         </div>
-                                        <p className="text-xs text-gray-500 mt-2">※タスク方式の場合、募集開始時に仮払いが必要です。</p>
+                                        <p className="text-xs text-gray-500 mt-2">※タスク方式の場合、募集開始時に仮決済が必要です。</p>
                                     </div>
                                 )}
                             </div>
@@ -602,7 +602,7 @@ export default function PostJobPage() {
                                     修正する
                                 </Button>
                                 <Button onClick={handleConfirmSubmit} disabled={isLoading}>
-                                    {pendingJobData.type === "project" ? "依頼を投稿する" : "仮払いへ進む"}
+                                    {pendingJobData.type === "project" ? "依頼を投稿する" : "仮決済へ進む"}
                                 </Button>
                             </div>
                         </div>

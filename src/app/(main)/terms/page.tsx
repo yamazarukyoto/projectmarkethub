@@ -34,7 +34,7 @@ export default function TermsPage() {
                         <li><strong>「クライアント」</strong>：本サービスを通じて業務を依頼するユーザー。</li>
                         <li><strong>「ワーカー」</strong>：本サービスを通じて業務を受託するユーザー。</li>
                         <li><strong>「本取引」</strong>：本サービスを通じてクライアントとワーカーの間で締結される業務委託契約。運営者は本取引の当事者ではありません。</li>
-                        <li><strong>「仮払い」</strong>：クライアントがワーカーに対する報酬を、運営者が指定する決済サービス（Stripe）を通じて一時的に預け入れること。</li>
+                        <li><strong>「仮決済（決済予約）」</strong>：クライアントがワーカーに対する報酬の支払いを確約するために、運営者が指定する決済サービスを通じて与信枠の確保または決済予約を行うこと。</li>
                     </ol>
                 </section>
 
@@ -100,13 +100,13 @@ export default function TermsPage() {
                 </section>
 
                 <section>
-                    <h2 className="text-xl font-bold mb-4 text-secondary border-b pb-2">第7条（仮払いおよび決済）</h2>
+                    <h2 className="text-xl font-bold mb-4 text-secondary border-b pb-2">第7条（決済および収納代行）</h2>
                     <ol className="list-decimal list-inside space-y-2 ml-2">
-                        <li>クライアントは、契約成立時に報酬相当額を仮払いするものとします。仮払いは、決済サービス（Stripe）を通じて行われます。</li>
-                        <li>仮払いされた金額は、クライアントによる検収完了後、システムにより自動的にワーカーに送金されます。</li>
-                        <li>検収完了前のキャンセルについては、システムの定める手続きに従い、自動的に処理されます。</li>
+                        <li><strong>代理受領権の付与：</strong>ワーカーは、本サービスを利用して報酬を受け取るにあたり、運営者に対して、クライアントから支払われる報酬を代理して受領する権限（代理受領権）を付与するものとします。</li>
+                        <li><strong>債務の消滅：</strong>クライアントが運営者に対して報酬相当額の決済（仮決済を含む）を行った時点で、クライアントのワーカーに対する報酬支払債務は消滅し、履行が完了したものとみなします。</li>
+                        <li><strong>収納代行：</strong>運営者は、ワーカーからの委託に基づき、クライアントからの報酬を収納代行（代理受領）し、検収完了等の条件が成就した後に、所定の手数料を控除した金額をワーカーへ引き渡します。</li>
+                        <li><strong>資金移動業の否定：</strong>本サービスにおける資金の流れは、商取引に基づく代金の収納代行であり、資金決済法上の「資金移動業」には該当しません。運営者は、ユーザー間の送金サービスを提供するものではありません。</li>
                         <li>決済に関するトラブル（クレジットカードの不正利用等）については、決済サービス提供者（Stripe）の規約に従って処理されます。</li>
-                        <li>運営者は、決済サービスの障害、遅延等により生じた損害について責任を負いません。</li>
                     </ol>
                 </section>
 
@@ -183,7 +183,7 @@ export default function TermsPage() {
                     <h2 className="text-xl font-bold mb-4 text-secondary border-b pb-2">第12条（退会）</h2>
                     <ol className="list-decimal list-inside space-y-2 ml-2">
                         <li>ユーザーは、運営者の定める退会手続により、本サービスから退会できるものとします。</li>
-                        <li>ただし、未完了の取引（仮払い中の案件、検収待ちの案件等）がある場合は、それらが完了するまで退会できません。</li>
+                        <li>ただし、未完了の取引（仮決済中の案件、検収待ちの案件等）がある場合は、それらが完了するまで退会できません。</li>
                         <li>退会後、ユーザーのデータは運営者の判断により削除または保持されます。</li>
                     </ol>
                 </section>
@@ -282,6 +282,7 @@ export default function TermsPage() {
                 <div className="text-right text-sm text-gray-500 mt-8">
                     <p>2025年11月23日 制定</p>
                     <p>2025年11月30日 改定</p>
+                    <p>2025年12月05日 改定 (Ver 5.1)</p>
                 </div>
             </div>
         </div>

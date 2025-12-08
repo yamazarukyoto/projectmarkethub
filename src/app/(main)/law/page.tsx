@@ -52,9 +52,10 @@ export default function LawPage() {
                             <th className="py-4 px-6 bg-gray-50 font-semibold text-secondary">支払時期</th>
                             <td className="py-4 px-6 text-text-body">
                                 <div className="space-y-2">
-                                    <p><span className="font-semibold">固定報酬制:</span> 契約締結時に仮払い（与信枠確保）、検収完了時に決済確定。</p>
-                                    <p><span className="font-semibold">タスク方式:</span> 募集開始時に仮払い、承認完了時に決済確定。</p>
-                                    <p><span className="font-semibold">コンペ方式:</span> 募集開始時に仮払い、採用決定時に決済確定。</p>
+                                    <p>契約締結時に決済処理を行い、役務提供完了まで支払いを留保します（収納代行）。</p>
+                                    <p><span className="font-semibold">固定報酬制:</span> 契約締結時に決済予約（与信確保）、検収完了時に決済確定。</p>
+                                    <p><span className="font-semibold">タスク方式:</span> 募集開始時に決済予約、承認完了時に決済確定。</p>
+                                    <p><span className="font-semibold">コンペ方式:</span> 募集開始時に決済予約、採用決定時に決済確定。</p>
                                 </div>
                             </td>
                         </tr>

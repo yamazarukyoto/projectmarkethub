@@ -84,7 +84,7 @@ export default function WorkerContractDetailPage() {
                             }`}>
                             {contract.status === 'completed' ? '完了' :
                                 contract.status === 'in_progress' ? '進行中' :
-                                    contract.status === 'escrow' ? '仮払い待ち' : contract.status}
+                                    contract.status === 'escrow' ? '仮決済済み' : contract.status}
                         </span>
                     </div>
                 </CardHeader>
@@ -132,7 +132,7 @@ export default function WorkerContractDetailPage() {
                                 {contract.status === 'in_progress' && <FileText size={16} className="text-blue-600" />}
                                 {contract.status === 'completed' && <CheckCircle size={16} className="text-green-600" />}
                                 <span>
-                                    {contract.status === 'waiting_for_escrow' ? 'クライアントの仮払い待ちです' :
+                                    {contract.status === 'waiting_for_escrow' ? 'クライアントの仮決済待ちです' :
                                      contract.status === 'escrow' ? '業務を開始してください' :
                                      contract.status === 'in_progress' ? '業務進行中' :
                                      contract.status === 'submitted' ? '検収待ち' :
@@ -146,7 +146,7 @@ export default function WorkerContractDetailPage() {
                         <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
                             <h4 className="font-bold text-yellow-900 mb-2">業務開始</h4>
                             <p className="text-sm text-yellow-800 mb-4">
-                                クライアントの仮払いが完了しました。業務を開始してください。
+                                クライアントの仮決済が完了しました。業務を開始してください。
                             </p>
                             <Button
                                 onClick={async () => {

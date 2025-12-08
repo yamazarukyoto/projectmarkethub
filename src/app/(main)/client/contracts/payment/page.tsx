@@ -75,7 +75,7 @@ export default function ClientContractPage() {
             {clientSecret && (
                 <Card className="max-w-md mx-auto">
                     <CardHeader>
-                        <CardTitle>仮払い手続き</CardTitle>
+                        <CardTitle>仮決済手続き</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <Elements stripe={stripePromise} options={{ clientSecret }}>

@@ -325,7 +325,7 @@ export default function ClientJobDetailPage() {
                                                                     if (data.error) {
                                                                         alert(data.error);
                                                                     } else {
-                                                                        alert("契約が作成されました。仮払いへ進みます。");
+                                                                        alert("契約が作成されました。仮決済へ進みます。");
                                                                         // Redirect to contract detail page
                                                                         router.push(`/client/contracts/${data.contractId}`);
                                                                     }
