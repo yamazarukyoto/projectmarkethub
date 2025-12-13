@@ -8,29 +8,34 @@ import { CreditCard, CheckCircle, ExternalLink } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 
 function PaymentSettingsContent() {
-    const { user } = useAuth();
+    const { user, firebaseUser } = useAuth();
     const searchParams = useSearchParams();
     const success = searchParams.get("success");
     const [loading, setLoading] = useState(false);
 
     const handleConnectStripe = async () => {
-        if (!user) return;
+        if (!user || !firebaseUser) return;
         setLoading(true);
         try {
+            const token = await firebaseUser.getIdToken();
             const response = await fetch("/api/stripe/connect", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
                 body: JSON.stringify({ userId: user.uid }),
             });
             const data = await response.json();
             if (data.url) {
                 window.location.href = data.url;
             } else {
-                alert("エラーが発生しました。");
+                console.error("Stripe Connect Error:", data);
+                alert(`エラーが発生しました: ${data.error || "不明なエラー"}`);
             }
         } catch (error) {
             console.error(error);
-            alert("エラーが発生しました。");
+            alert("通信エラーが発生しました。");
         } finally {
             setLoading(false);
         }

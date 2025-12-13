@@ -238,7 +238,9 @@ export default function PostJobPage() {
             } else {
                 // コンペ・タスクの場合は仮決済へ
                 setCreatedJobId(jobId);
-                await handlePayment(jobId, jobData.budget);
+                // 税込金額を計算して渡す
+                const taxIncludedAmount = Math.floor(jobData.budget * 1.1);
+                await handlePayment(jobId, taxIncludedAmount);
             }
         } catch (err) {
             console.error("Error creating job:", err);
@@ -272,7 +274,34 @@ export default function PostJobPage() {
             setIsPaymentModalOpen(true);
         } catch (error) {
             console.error("Error creating payment intent:", error);
-            alert("仮決済準備中にエラーが発生しました。");
+            alert(`仮決済準備中にエラーが発生しました: ${error instanceof Error ? error.message : "不明なエラー"}`);
+            setIsLoading(false); // Ensure loading state is reset on error
+        }
+    };
+
+    const handlePaymentSuccess = async () => {
+        setIsPaymentModalOpen(false);
+        
+        // 決済完了を確認してステータスを更新する
+        try {
+            if (createdJobId) {
+                const token = await auth.currentUser?.getIdToken();
+                await fetch("/api/stripe/verify-payment", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ jobId: createdJobId }),
+                });
+            }
+            alert("仮決済が完了し、募集を開始しました！");
+            router.push("/client/dashboard");
+        } catch (error) {
+            console.error("Error verifying payment:", error);
+            // 決済自体は成功しているので、ダッシュボードへ誘導
+            alert("仮決済が完了しました。募集開始まで少し時間がかかる場合があります。");
+            router.push("/client/dashboard");
         }
     };
 
@@ -504,11 +533,7 @@ export default function PostJobPage() {
                     isOpen={isPaymentModalOpen}
                     onClose={() => setIsPaymentModalOpen(false)}
                     clientSecret={clientSecret}
-                    onSuccess={() => {
-                        setIsPaymentModalOpen(false);
-                        alert("仮決済が完了し、募集を開始しました！");
-                        router.push("/client/dashboard");
-                    }}
+                    onSuccess={handlePaymentSuccess}
                 />
             )}
 

@@ -1,7 +1,7 @@
 import Stripe from 'stripe';
 
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'dummy_key', {
-    apiVersion: '2024-11-20.acacia' as any, // Force version or update package
+    apiVersion: '2025-01-27.acacia' as any, // Use latest or cast to any to avoid type mismatch with installed package
     typescript: true,
 });
 
@@ -15,9 +15,7 @@ export const createPaymentIntent = async (
         currency,
         capture_method: 'manual', // 仮払い（オーソリのみ）
         metadata,
-        automatic_payment_methods: {
-            enabled: true,
-        },
+        payment_method_types: ['card'], // カード決済のみを許可（Link等の干渉回避）
     });
 };
 

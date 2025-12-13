@@ -65,6 +65,11 @@ service cloud.firestore {
       }
     }
     
+    // Allow access to proposals for room creation check
+    match /proposals/{proposalId} {
+      allow read: if isAuthenticated() && (resource.data.workerId == request.auth.uid || resource.data.clientId == request.auth.uid);
+    }
+    
     // Legacy Messages collection (if used)
     match /messages/{roomId} {
        allow read, write: if isAuthenticated(); // Fallback if structure is different

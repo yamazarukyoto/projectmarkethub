@@ -1,17 +1,24 @@
 import { NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
-import { db } from "@/lib/firebase";
-import { doc, updateDoc } from "firebase/firestore";
+import { adminAuth, adminDb } from "@/lib/firebase-admin";
 
 export async function POST(req: Request) {
     let userId: string | null = null;
     
     try {
-        const body = await req.json();
-        userId = body.userId;
+        // 1. 認証チェック
+        const authHeader = req.headers.get("Authorization");
+        if (!authHeader?.startsWith("Bearer ")) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+        const token = authHeader.split("Bearer ")[1];
+        const decodedToken = await adminAuth.verifyIdToken(token);
+        userId = decodedToken.uid;
 
-        if (!userId) {
-            return NextResponse.json({ error: "User ID is required" }, { status: 400 });
+        const body = await req.json();
+        // body.userId と token.uid が一致するか確認（念のため）
+        if (body.userId && body.userId !== userId) {
+             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
         // Stripeが無効な場合のデモ動作
@@ -19,7 +26,7 @@ export async function POST(req: Request) {
             console.warn("Stripe is not configured. Simulating Connect flow.");
             
             // デモ用IDを保存
-            await updateDoc(doc(db, "users", userId), {
+            await adminDb.collection("users").doc(userId).update({
                 stripeAccountId: "acct_demo_" + Date.now(),
             });
 
@@ -40,7 +47,7 @@ export async function POST(req: Request) {
         });
 
         // Save the Stripe Account ID to Firestore
-        await updateDoc(doc(db, "users", userId), {
+        await adminDb.collection("users").doc(userId).update({
             stripeAccountId: account.id,
         });
 
@@ -53,14 +60,18 @@ export async function POST(req: Request) {
         });
 
         return NextResponse.json({ url: accountLink.url });
-    } catch (error) {
+    } catch (error: any) {
         console.error("Stripe Connect Error:", error);
+        
+        // 詳細なエラー情報を返す
+        const errorMessage = error.message || "Unknown error occurred";
+        const errorType = error.type || "UnknownType";
         
         // Fallback to demo if Stripe fails
         console.warn("Stripe Connect failed, falling back to demo.");
         
         if (userId) {
-             await updateDoc(doc(db, "users", userId), {
+             await adminDb.collection("users").doc(userId).update({
                 stripeAccountId: "acct_demo_fallback_" + Date.now(),
             });
             return NextResponse.json({ 
@@ -68,6 +79,6 @@ export async function POST(req: Request) {
             });
         }
 
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+        return NextResponse.json({ error: errorMessage, type: errorType }, { status: 500 });
     }
 }

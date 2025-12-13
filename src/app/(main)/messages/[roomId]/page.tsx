@@ -8,45 +8,116 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { getJob, getProposal, addNegotiationMessage } from "@/lib/db";
-import { Job, Proposal } from "@/types";
-import { doc, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { Job, Proposal, Contract } from "@/types";
+import { doc, onSnapshot, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { db, auth } from "@/lib/firebase";
 import { ArrowLeft, DollarSign, Calendar, CheckCircle } from "lucide-react";
 
 export default function MessageRoomPage() {
     const params = useParams();
     const router = useRouter();
-    const roomId = params.roomId as string; // roomId is proposalId
+    const roomId = params.roomId as string; // roomId is proposalId or contractId
     const { user } = useAuth();
     
     const [proposal, setProposal] = useState<Proposal | null>(null);
+    const [contract, setContract] = useState<Contract | null>(null);
     const [job, setJob] = useState<Job | null>(null);
     const [loading, setLoading] = useState(true);
     const [negotiationPrice, setNegotiationPrice] = useState<number>(0);
     const [negotiationMessage, setNegotiationMessage] = useState("");
     const [isNegotiating, setIsNegotiating] = useState(false);
+    const [isContractRoom, setIsContractRoom] = useState(false);
 
     useEffect(() => {
         if (!roomId || !user) return;
 
-        // Real-time listener for proposal (conditions)
-        const unsub = onSnapshot(doc(db, "proposals", roomId), async (docSnap) => {
+        // First, try to find as proposal
+        const unsubProposal = onSnapshot(doc(db, "proposals", roomId), async (docSnap) => {
             if (docSnap.exists()) {
                 const p = { id: docSnap.id, ...docSnap.data() } as Proposal;
                 setProposal(p);
                 setNegotiationPrice(p.price);
+                setIsContractRoom(false);
 
                 // Fetch job if not already fetched
                 if (!job) {
                     const j = await getJob(p.jobId);
                     setJob(j);
                 }
+                setLoading(false);
+            } else {
+                // If not found as proposal, try as contract (for competition type)
+                const contractSnap = await getDoc(doc(db, "contracts", roomId));
+                if (contractSnap.exists()) {
+                    const c = { id: contractSnap.id, ...contractSnap.data() } as Contract;
+                    setContract(c);
+                    setIsContractRoom(true);
+                    
+                    // Fetch job
+                    if (!job) {
+                        const j = await getJob(c.jobId);
+                        setJob(j);
+                    }
+                }
+                setLoading(false);
             }
-            setLoading(false);
         });
 
-        return () => unsub();
+        return () => unsubProposal();
     }, [roomId, user, job]);
+
+    // Ensure chat room exists
+    useEffect(() => {
+        if (!user) return;
+        
+        // For proposal-based room
+        if (proposal) {
+            const checkAndCreateRoom = async () => {
+                try {
+                    const roomRef = doc(db, "rooms", proposal.id);
+                    const roomSnap = await getDoc(roomRef);
+                    
+                    if (!roomSnap.exists()) {
+                        await setDoc(roomRef, {
+                            participants: {
+                                [proposal.clientId]: true,
+                                [proposal.workerId]: true
+                            },
+                            createdAt: serverTimestamp(),
+                            updatedAt: serverTimestamp()
+                        });
+                    }
+                } catch (error) {
+                    console.error("Error checking/creating room:", error);
+                }
+            };
+            checkAndCreateRoom();
+        }
+        
+        // For contract-based room (competition type)
+        if (contract) {
+            const checkAndCreateRoom = async () => {
+                try {
+                    const roomRef = doc(db, "rooms", contract.id);
+                    const roomSnap = await getDoc(roomRef);
+                    
+                    if (!roomSnap.exists()) {
+                        await setDoc(roomRef, {
+                            participants: {
+                                [contract.clientId]: true,
+                                [contract.workerId]: true
+                            },
+                            createdAt: serverTimestamp(),
+                            updatedAt: serverTimestamp()
+                        });
+                    }
+                } catch (error) {
+                    console.error("Error checking/creating room:", error);
+                }
+            };
+            checkAndCreateRoom();
+        }
+    }, [proposal?.id, proposal?.clientId, proposal?.workerId, contract?.id, contract?.clientId, contract?.workerId, user]);
 
     const handleNegotiate = async () => {
         if (!proposal || !user) return;
@@ -72,9 +143,13 @@ export default function MessageRoomPage() {
         if (!confirm("現在の条件で契約を作成しますか？")) return;
 
         try {
+            const token = await auth.currentUser?.getIdToken();
             const res = await fetch("/api/contracts/create", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
                 body: JSON.stringify({
                     proposalId: proposal.id,
                     jobId: job.id,
@@ -99,6 +174,80 @@ export default function MessageRoomPage() {
 
     if (loading) return <div className="p-8 text-center">読み込み中...</div>;
     if (!user) return <div className="p-8 text-center">ログインしてください</div>;
+    
+    // コンペ方式（契約ベースのルーム）の場合
+    if (isContractRoom && contract && job) {
+        const isClient = user.uid === contract.clientId;
+        const partnerId = isClient ? contract.workerId : contract.clientId;
+        
+        return (
+            <div className="container mx-auto px-4 py-8 h-[calc(100vh-64px)]">
+                <div className="flex items-center mb-4">
+                    <Button variant="ghost" onClick={() => router.back()} className="mr-4">
+                        <ArrowLeft size={20} />
+                    </Button>
+                    <div>
+                        <h1 className="text-xl font-bold text-secondary flex items-center gap-2">
+                            <span>契約に関するメッセージ</span>
+                        </h1>
+                        <p className="text-sm text-gray-500">案件: {contract.jobTitle || job.title}</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+                    {/* Main Chat Area */}
+                    <div className="lg:col-span-2 h-full">
+                        <ChatBox roomId={roomId} currentUserId={user.uid} />
+                    </div>
+
+                    {/* Contract Info Panel (Sidebar) */}
+                    <div className="space-y-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-lg">契約情報</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                                    <div className="flex items-center gap-2 text-gray-600">
+                                        <DollarSign size={18} />
+                                        <span className="text-sm font-medium">契約金額 (税抜)</span>
+                                    </div>
+                                    <span className="text-lg font-bold text-secondary">
+                                        {contract.amount.toLocaleString()}円
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                                    <div className="flex items-center gap-2 text-gray-600">
+                                        <Calendar size={18} />
+                                        <span className="text-sm font-medium">ステータス</span>
+                                    </div>
+                                    <span className="text-base font-medium">
+                                        {contract.status === 'escrow' ? '仮決済済み' :
+                                         contract.status === 'in_progress' ? '業務中' :
+                                         contract.status === 'submitted' ? '納品済み' :
+                                         contract.status === 'completed' ? '完了' : contract.status}
+                                    </span>
+                                </div>
+
+                                {/* Contract Status */}
+                                <div className="pt-4 border-t">
+                                    <div className="bg-green-50 text-green-800 p-3 rounded-lg text-center text-sm font-bold">
+                                        <CheckCircle size={16} className="inline mr-1" />
+                                        契約済み
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-2 text-center">
+                                        契約詳細は契約管理ページからご確認ください。
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+    
+    // プロジェクト方式（提案ベースのルーム）の場合
     if (!proposal || !job) return <div className="p-8 text-center">データが見つかりません</div>;
 
     const isClient = user.uid === job.clientId;
@@ -181,7 +330,7 @@ export default function MessageRoomPage() {
                                     </div>
                                     <Button 
                                         onClick={handleNegotiate} 
-                                        disabled={isNegotiating || negotiationPrice === proposal.price}
+                                        disabled={isNegotiating || (negotiationPrice === proposal.price && !negotiationMessage)}
                                         variant="outline"
                                         className="w-full"
                                     >
@@ -191,7 +340,7 @@ export default function MessageRoomPage() {
                             </div>
 
                             {/* Contract Action (Client Only) */}
-                            {isClient && (
+                            {isClient && proposal.status !== 'hired' && proposal.status !== 'adopted' && (
                                 <div className="pt-4 border-t">
                                     <Button 
                                         onClick={handleCreateContract} 
@@ -203,6 +352,15 @@ export default function MessageRoomPage() {
                                     <p className="text-xs text-gray-500 mt-2 text-center">
                                         契約を作成し、仮決済へ進みます。
                                     </p>
+                                </div>
+                            )}
+                            
+                            {(proposal.status === 'hired' || proposal.status === 'adopted') && (
+                                <div className="pt-4 border-t">
+                                    <div className="bg-green-50 text-green-800 p-3 rounded-lg text-center text-sm font-bold">
+                                        <CheckCircle size={16} className="inline mr-1" />
+                                        契約済み
+                                    </div>
                                 </div>
                             )}
                         </CardContent>

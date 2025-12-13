@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { ArrowLeft, CheckCircle, Clock, FileText, Upload, X, MessageSquare } from "lucide-react";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { ReviewModal } from "@/components/features/contract/ReviewModal";
@@ -29,17 +29,16 @@ export default function WorkerContractDetailPage() {
     const [isDragging, setIsDragging] = useState(false);
 
     useEffect(() => {
-        const fetchContract = async () => {
-            if (params.id) {
-                const docRef = doc(db, "contracts", params.id as string);
-                const docSnap = await getDoc(docRef);
-                if (docSnap.exists()) {
-                    setContract({ id: docSnap.id, ...docSnap.data() } as Contract);
-                }
+        if (!params.id) return;
+
+        const unsubscribe = onSnapshot(doc(db, "contracts", params.id as string), (docSnap) => {
+            if (docSnap.exists()) {
+                setContract({ id: docSnap.id, ...docSnap.data() } as Contract);
             }
             setLoading(false);
-        };
-        fetchContract();
+        });
+
+        return () => unsubscribe();
     }, [params.id]);
 
     const handleReviewSubmit = async (rating: number, comment: string) => {
@@ -64,14 +63,13 @@ export default function WorkerContractDetailPage() {
                     <ArrowLeft size={20} className="mr-2" />
                     戻る
                 </Button>
-                {contract.proposalId && (
-                    <Link href={`/messages/${contract.proposalId}`}>
-                        <Button variant="outline">
-                            <MessageSquare size={16} className="mr-2" />
-                            メッセージ
-                        </Button>
-                    </Link>
-                )}
+                {/* コンペ方式の場合は契約IDをルームIDとして使用、それ以外はproposalIdを使用 */}
+                <Link href={`/messages/${contract.proposalId || contract.id}`}>
+                    <Button variant="outline">
+                        <MessageSquare size={16} className="mr-2" />
+                        メッセージ
+                    </Button>
+                </Link>
             </div>
 
             <Card>
@@ -268,10 +266,22 @@ export default function WorkerContractDetailPage() {
                     {(contract.status === 'submitted' || contract.status === 'completed') && (
                         <div className="bg-green-50 p-4 rounded-lg border border-green-100">
                             <h4 className="font-bold text-green-900 mb-2">納品済み</h4>
-                            <div className="space-y-2 text-sm text-green-800">
-                                <p><strong>成果物URL:</strong> <a href={contract.deliveryFileUrl} target="_blank" rel="noopener noreferrer" className="underline">{contract.deliveryFileUrl}</a></p>
-                                <p><strong>メッセージ:</strong></p>
-                                <p className="whitespace-pre-wrap bg-white p-2 rounded border border-green-200">{contract.deliveryMessage}</p>
+                            <div className="space-y-2 text-sm text-green-800 overflow-hidden">
+                                <div>
+                                    <strong>成果物URL:</strong>
+                                    <a 
+                                        href={contract.deliveryFileUrl} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer" 
+                                        className="underline block break-all mt-1"
+                                    >
+                                        {contract.deliveryFileUrl}
+                                    </a>
+                                </div>
+                                <div>
+                                    <strong>メッセージ:</strong>
+                                    <p className="whitespace-pre-wrap bg-white p-2 rounded border border-green-200 mt-1">{contract.deliveryMessage}</p>
+                                </div>
                             </div>
                             {contract.status === 'submitted' && (
                                 <p className="mt-4 text-sm font-bold text-green-800">

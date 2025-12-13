@@ -17,8 +17,8 @@
       {
         "source": "**",
         "run": {
-          "serviceId": "nextjs-app",
-          "region": "us-central1"
+          "serviceId": "projectmarkethub",
+          "region": "asia-northeast1"
         }
       }
     ]

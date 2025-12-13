@@ -12,7 +12,7 @@ import { Job, Proposal } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { ArrowLeft, Clock, DollarSign, Calendar, Tag, CheckCircle, Paperclip, Download, Upload, X, FileText } from "lucide-react";
+import { ArrowLeft, Clock, DollarSign, Calendar, Tag, CheckCircle, Paperclip, Download, Upload, X, FileText, MessageSquare } from "lucide-react";
 import { Timestamp } from "firebase/firestore";
 import { TaskWorkspace } from "@/components/features/task/TaskWorkspace";
 import { storage } from "@/lib/firebase";
@@ -35,6 +35,7 @@ export default function WorkerJobDetailPage() {
     const [submitting, setSubmitting] = useState(false);
     const [hasApplied, setHasApplied] = useState(false);
     const [contractId, setContractId] = useState<string | null>(null);
+    const [proposalId, setProposalId] = useState<string | null>(null);
     const [files, setFiles] = useState<File[]>([]);
 
     const {
@@ -55,10 +56,12 @@ export default function WorkerJobDetailPage() {
 
                     // Check if already applied
                     const myProposals = await getWorkerProposals(user.uid);
-                    const applied = myProposals.some(p => p.jobId === jobId);
+                    const myProposal = myProposals.find(p => p.jobId === jobId);
+                    const applied = !!myProposal;
                     setHasApplied(applied);
 
-                    if (applied) {
+                    if (applied && myProposal) {
+                        setProposalId(myProposal.id);
                         const contracts = await getContracts(user.uid, 'worker');
                         const myContract = contracts.find(c => c.jobId === jobId);
                         if (myContract) {
@@ -284,6 +287,15 @@ export default function WorkerJobDetailPage() {
                                         <h3 className="text-lg font-bold text-green-800 mb-2">応募済み</h3>
                                         <p className="text-gray-600 mb-4">この案件には既に応募しています。</p>
                                         <div className="flex flex-col gap-2">
+                                            {/* コンペ方式の場合は契約ID、それ以外はproposalIdでメッセージルームへ */}
+                                            {(proposalId || contractId) && (
+                                                <Link href={`/messages/${contractId || proposalId}`}>
+                                                    <Button variant="outline" className="w-full">
+                                                        <MessageSquare size={16} className="mr-2" />
+                                                        クライアントにメッセージ
+                                                    </Button>
+                                                </Link>
+                                            )}
                                             <Link href="/worker/applications">
                                                 <Button variant="outline" className="w-full">応募管理へ</Button>
                                             </Link>

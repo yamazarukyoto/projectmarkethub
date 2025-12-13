@@ -8,7 +8,7 @@ import { Contract } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { ArrowLeft, CheckCircle, Clock, FileText, CreditCard, MessageSquare } from "lucide-react";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import Link from "next/link";
 import { PaymentModal } from "@/components/features/contract/PaymentModal";
@@ -27,17 +27,16 @@ export default function ClientContractDetailPage() {
     const [isProcessing, setIsProcessing] = useState(false);
 
     useEffect(() => {
-        const fetchContract = async () => {
-            if (params.id) {
-                const docRef = doc(db, "contracts", params.id as string);
-                const docSnap = await getDoc(docRef);
-                if (docSnap.exists()) {
-                    setContract({ id: docSnap.id, ...docSnap.data() } as Contract);
-                }
+        if (!params.id) return;
+        
+        const unsubscribe = onSnapshot(doc(db, "contracts", params.id as string), (docSnap) => {
+            if (docSnap.exists()) {
+                setContract({ id: docSnap.id, ...docSnap.data() } as Contract);
             }
             setLoading(false);
-        };
-        fetchContract();
+        });
+
+        return () => unsubscribe();
     }, [params.id]);
 
     const handleEscrow = async () => {
@@ -135,14 +134,13 @@ export default function ClientContractDetailPage() {
                     <ArrowLeft size={20} className="mr-2" />
                     戻る
                 </Button>
-                {contract.proposalId && (
-                    <Link href={`/messages/${contract.proposalId}`}>
-                        <Button variant="outline">
-                            <MessageSquare size={16} className="mr-2" />
-                            メッセージ
-                        </Button>
-                    </Link>
-                )}
+                {/* コンペ方式の場合は契約IDをルームIDとして使用、それ以外はproposalIdを使用 */}
+                <Link href={`/messages/${contract.proposalId || contract.id}`}>
+                    <Button variant="outline">
+                        <MessageSquare size={16} className="mr-2" />
+                        メッセージ
+                    </Button>
+                </Link>
             </div>
 
             <Card>
@@ -231,8 +229,18 @@ export default function ClientContractDetailPage() {
                     {(contract.status === 'submitted' || contract.status === 'completed') && (
                         <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
                             <h4 className="font-bold text-blue-900 mb-2">納品物</h4>
-                            <div className="space-y-2 text-sm text-blue-800 mb-4 bg-white p-3 rounded border border-blue-200">
-                                <p><strong>成果物URL:</strong> <a href={contract.deliveryFileUrl} target="_blank" rel="noopener noreferrer" className="underline text-primary">{contract.deliveryFileUrl}</a></p>
+                            <div className="space-y-2 text-sm text-blue-800 mb-4 bg-white p-3 rounded border border-blue-200 overflow-hidden">
+                                <div>
+                                    <strong>成果物URL:</strong>
+                                    <a 
+                                        href={contract.deliveryFileUrl} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer" 
+                                        className="underline text-primary block break-all mt-1"
+                                    >
+                                        {contract.deliveryFileUrl}
+                                    </a>
+                                </div>
                                 <div className="mt-2">
                                     <strong>メッセージ:</strong>
                                     <p className="whitespace-pre-wrap mt-1">{contract.deliveryMessage}</p>

@@ -1386,3 +1386,6 @@ NEXT_PUBLIC_FIREBASE_APP_ID=1:173689610587:web:ea5e28f0e2e65e6cb43a7e
 | 日付 | 変更内容 |
 | :--- | :--- |
 | 2025-12-08 | Firebaseプロジェクトを`projectmarkethub`から`projectmarkethub-db904`に統合。旧プロジェクト`projectmarkethub`(700356537492)は削除済み。Google認証設定を完了。 |
+| 2025-12-13 | Stripe決済エラー（Link干渉）修正のため、PaymentIntent作成時に `payment_method_types: ['card']` を指定し、クレジットカード決済のみに限定。 |
+| 2025-12-13 | 不具合修正：ワーカーメッセージ送信時のルーム自動作成、契約詳細画面のリアルタイム更新化、契約済みステータス時のUI制御追加。 |
+| 2025-12-13 | 不具合修正：契約作成APIの認証エラー修正（Authorizationヘッダー追加）、Firestoreセキュリティルールの緩和（チャットルーム作成権限）、ワーカー側契約画面のリアルタイム更新化。 |

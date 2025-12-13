@@ -99,6 +99,8 @@ export async function POST(req: NextRequest) {
       currency: "jpy",
       capture_method: "manual", // 仮決済
       metadata: metadata,
+      payment_method_types: ['card'], // カード決済のみを許可（Link等の干渉回避）
+      description: contractId ? `Contract: ${contractId}` : `Job: ${jobId}`,
     };
 
     // 契約あり（プロジェクト方式）の場合は送金先指定

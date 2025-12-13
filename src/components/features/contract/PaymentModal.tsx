@@ -101,6 +101,21 @@ export const PaymentModal = ({ isOpen, onClose, clientSecret, onSuccess }: Payme
             クレジットカード情報を入力してください。この段階では決済は確定せず、仮払い（与信枠の確保）となります。
             検収完了時に決済が確定します。
           </p>
+
+          {process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?.startsWith('pk_test_') && (
+            <div className="mb-4 p-3 bg-blue-50 text-blue-700 text-sm rounded-md border border-blue-100">
+              <p className="font-bold mb-1">【テスト環境用カード番号】</p>
+              <div className="grid grid-cols-[auto,1fr] gap-x-2 gap-y-1">
+                <span>番号:</span>
+                <span className="font-mono">4242 4242 4242 4242</span>
+                <span>有効期限:</span>
+                <span>任意の未来の日付 (例: 12/30)</span>
+                <span>CVC:</span>
+                <span>任意の3桁 (例: 123)</span>
+              </div>
+            </div>
+          )}
+
           {clientSecret && (
             <Elements stripe={stripePromise} options={options}>
               <CheckoutForm onSuccess={onSuccess} onClose={onClose} />
