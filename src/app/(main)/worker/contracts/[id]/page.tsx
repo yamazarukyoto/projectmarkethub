@@ -267,13 +267,14 @@ export default function WorkerContractDetailPage() {
                         <div className="bg-green-50 p-4 rounded-lg border border-green-100">
                             <h4 className="font-bold text-green-900 mb-2">納品済み</h4>
                             <div className="space-y-2 text-sm text-green-800 overflow-hidden">
-                                <div>
+                                <div className="overflow-hidden">
                                     <strong>成果物URL:</strong>
                                     <a 
                                         href={contract.deliveryFileUrl} 
                                         target="_blank" 
                                         rel="noopener noreferrer" 
-                                        className="underline block break-all mt-1"
+                                        className="underline block mt-1 overflow-hidden text-ellipsis"
+                                        style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}
                                     >
                                         {contract.deliveryFileUrl}
                                     </a>

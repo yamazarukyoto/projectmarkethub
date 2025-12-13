@@ -230,13 +230,14 @@ export default function ClientContractDetailPage() {
                         <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
                             <h4 className="font-bold text-blue-900 mb-2">納品物</h4>
                             <div className="space-y-2 text-sm text-blue-800 mb-4 bg-white p-3 rounded border border-blue-200 overflow-hidden">
-                                <div>
+                                <div className="overflow-hidden">
                                     <strong>成果物URL:</strong>
                                     <a 
                                         href={contract.deliveryFileUrl} 
                                         target="_blank" 
                                         rel="noopener noreferrer" 
-                                        className="underline text-primary block break-all mt-1"
+                                        className="underline text-primary block mt-1 overflow-hidden text-ellipsis"
+                                        style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}
                                     >
                                         {contract.deliveryFileUrl}
                                     </a>

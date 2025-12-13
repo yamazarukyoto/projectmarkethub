@@ -58,6 +58,16 @@ export default function MessageRoomPage() {
                         const j = await getJob(c.jobId);
                         setJob(j);
                     }
+                    
+                    // コンペ方式の場合、proposalIdがあれば提案情報も取得
+                    if (c.proposalId) {
+                        const proposalSnap = await getDoc(doc(db, "proposals", c.proposalId));
+                        if (proposalSnap.exists()) {
+                            const p = { id: proposalSnap.id, ...proposalSnap.data() } as Proposal;
+                            setProposal(p);
+                            setNegotiationPrice(p.price);
+                        }
+                    }
                 }
                 setLoading(false);
             }
@@ -216,18 +226,43 @@ export default function MessageRoomPage() {
                                         {contract.amount.toLocaleString()}円
                                     </span>
                                 </div>
+                                
+                                {/* 提案情報（コンペ方式で提案がある場合） */}
+                                {proposal && (
+                                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                                        <div className="flex items-center gap-2 text-gray-600">
+                                            <Calendar size={18} />
+                                            <span className="text-sm font-medium">完了予定</span>
+                                        </div>
+                                        <span className="text-base font-medium">
+                                            {proposal.estimatedDuration}
+                                        </span>
+                                    </div>
+                                )}
+                                
                                 <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                                     <div className="flex items-center gap-2 text-gray-600">
                                         <Calendar size={18} />
                                         <span className="text-sm font-medium">ステータス</span>
                                     </div>
                                     <span className="text-base font-medium">
-                                        {contract.status === 'escrow' ? '仮決済済み' :
+                                        {contract.status === 'waiting_for_escrow' ? '仮決済待ち' :
+                                         contract.status === 'escrow' ? '仮決済済み' :
                                          contract.status === 'in_progress' ? '業務中' :
                                          contract.status === 'submitted' ? '納品済み' :
                                          contract.status === 'completed' ? '完了' : contract.status}
                                     </span>
                                 </div>
+
+                                {/* 提案メッセージ（コンペ方式で提案がある場合） */}
+                                {proposal && proposal.message && (
+                                    <div className="pt-4 border-t">
+                                        <h3 className="text-sm font-bold mb-2">提案内容</h3>
+                                        <p className="text-sm text-gray-600 whitespace-pre-wrap bg-gray-50 p-3 rounded-lg">
+                                            {proposal.message}
+                                        </p>
+                                    </div>
+                                )}
 
                                 {/* Contract Status */}
                                 <div className="pt-4 border-t">
