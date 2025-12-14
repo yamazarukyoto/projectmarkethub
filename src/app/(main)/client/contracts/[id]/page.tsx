@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import React, { useEffect, useState, useCallback } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { updateContractStatus } from "@/lib/db";
 import { Contract } from "@/types";
@@ -18,6 +18,7 @@ import { updateUserRating } from "@/lib/db";
 export default function ClientContractDetailPage() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { user } = useAuth();
     const [contract, setContract] = useState<Contract | null>(null);
     const [loading, setLoading] = useState(true);
@@ -25,6 +26,31 @@ export default function ClientContractDetailPage() {
     const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
     const [clientSecret, setClientSecret] = useState<string | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
+
+    // 決済完了を検証する関数
+    const verifyPayment = useCallback(async (contractId: string) => {
+        try {
+            const token = await auth.currentUser?.getIdToken();
+            if (!token) return;
+            
+            const res = await fetch("/api/stripe/verify-payment", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ contractId }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                console.log("Payment verified successfully");
+            } else if (data.error) {
+                console.error("Verify payment error:", data.error);
+            }
+        } catch (error) {
+            console.error("Error verifying payment:", error);
+        }
+    }, []);
 
     useEffect(() => {
         if (!params.id) return;
@@ -38,6 +64,25 @@ export default function ClientContractDetailPage() {
 
         return () => unsubscribe();
     }, [params.id]);
+
+    // 3Dセキュア認証後のリダイレクト処理
+    useEffect(() => {
+        const paymentIntent = searchParams.get("payment_intent");
+        const redirectStatus = searchParams.get("redirect_status");
+        
+        if (paymentIntent && redirectStatus === "succeeded" && params.id) {
+            // URLパラメータをクリア
+            const url = new URL(window.location.href);
+            url.searchParams.delete("payment_intent");
+            url.searchParams.delete("payment_intent_client_secret");
+            url.searchParams.delete("redirect_status");
+            window.history.replaceState({}, "", url.pathname);
+            
+            // 決済完了を検証
+            verifyPayment(params.id as string);
+            alert("仮決済が完了しました。");
+        }
+    }, [searchParams, params.id, verifyPayment]);
 
     const handleEscrow = async () => {
         if (!contract) return;
