@@ -1347,3 +1347,93 @@ onSuccess={async () => {
 
 1. `src/app/(main)/client/contracts/[id]/page.tsx`を修正
 2. デプロイして動作確認
+
+### 14.6 追加修正（2025-12-14）
+
+**発見された追加問題:**
+- 3Dセキュア認証が必要な場合、ユーザーはStripeの認証ページにリダイレクトされる
+- リダイレクト後に戻ってきた時、`onSuccess`コールバックが呼ばれない
+- そのため、DBステータスが`waiting_for_escrow`のまま残る
+
+**追加修正内容:**
+1. クライアント契約詳細ページで、ページロード時にURLパラメータ（`payment_intent`, `redirect_status`）をチェック
+2. `redirect_status === "succeeded"`の場合、`verify-payment` APIを呼び出してDBを更新
+3. URLパラメータをクリアして、リロード時の重複処理を防止
+
+**修正ファイル:**
+- `src/app/(main)/client/contracts/[id]/page.tsx`
+
+**修正コード:**
+```typescript
+// 3Dセキュア認証後のリダイレクト処理
+useEffect(() => {
+    const paymentIntent = searchParams.get("payment_intent");
+    const redirectStatus = searchParams.get("redirect_status");
+    
+    if (paymentIntent && redirectStatus === "succeeded" && params.id) {
+        // URLパラメータをクリア
+        const url = new URL(window.location.href);
+        url.searchParams.delete("payment_intent");
+        url.searchParams.delete("payment_intent_client_secret");
+        url.searchParams.delete("redirect_status");
+        window.history.replaceState({}, "", url.pathname);
+        
+        // 決済完了を検証
+        verifyPayment(params.id as string);
+        alert("仮決済が完了しました。");
+    }
+}, [searchParams, params.id, verifyPayment]);
+```
+
+**既存データの修正:**
+- `fix_contract_status.js`スクリプトを作成
+- `waiting_for_escrow`ステータスの契約で、Stripeで決済が完了しているものを`escrow`に更新
+- 実行結果: 2件の契約を修正
+  - 契約ID: 0cw7lGuFa6SJx6kRg4d9 (案件名: rrr)
+  - 契約ID: YjG79kwU9CQe6J7JHRcQ (案件名: www)
+
+---
+
+## 15. 修正計画（2025-12-14 ワーカー報酬受取機能の改善）
+
+### 15.1 問題点の分析
+
+**報告された問題:**
+クライアントの検収が終わったあと、本支払いをし、ワーカーが報酬を受け取る部分が未完成。ワーカーがStripeにアクセスし、支払い状況を確認できない。
+
+**現状の実装:**
+1. `src/app/(main)/account/worker/payout/page.tsx` - Stripe Connect連携のみ
+2. `src/app/api/stripe/connect/route.ts` - Stripe Expressアカウント作成
+3. `src/app/api/stripe/capture-payment-intent/route.ts` - 検収完了時にTransfer実行
+
+**不足している機能:**
+1. ワーカーがStripeダッシュボードにアクセスして支払い状況を確認する機能
+2. 完了した契約の報酬履歴を表示する機能
+3. Stripe Connect Expressアカウントのダッシュボードへのリンク
+
+### 15.2 修正内容
+
+#### ①Stripe Connect Expressダッシュボードへのリンク追加
+**対象ファイル:**
+- `src/app/(main)/account/worker/payout/page.tsx`
+- `src/app/api/stripe/connect/route.ts` (ダッシュボードリンク生成API追加)
+
+**修正内容:**
+- Stripe Connect連携済みの場合、「Stripeダッシュボードを開く」ボタンを追加
+- `stripe.accounts.createLoginLink()` APIを使用してダッシュボードURLを生成
+
+#### ②報酬履歴の表示機能追加
+**対象ファイル:**
+- `src/app/(main)/account/worker/payout/page.tsx`
+
+**修正内容:**
+- 完了した契約（`status: 'completed'`）の一覧を表示
+- 各契約の報酬金額、完了日、Transfer IDを表示
+
+### 15.3 実装手順
+
+1. `src/app/api/stripe/connect/route.ts`にGETメソッドを追加（ダッシュボードリンク生成）
+2. `src/app/(main)/account/worker/payout/page.tsx`を改修
+   - Stripeダッシュボードへのリンクボタン追加
+   - 報酬履歴セクション追加
+3. デプロイして動作確認
