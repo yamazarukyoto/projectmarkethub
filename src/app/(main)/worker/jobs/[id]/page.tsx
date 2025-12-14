@@ -7,14 +7,13 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { getJob, createProposal, getWorkerProposals, getContracts, createTaskSubmission } from "@/lib/db";
+import { getJob, createProposal, getWorkerProposals, getContracts } from "@/lib/db";
 import { Job, Proposal } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { ArrowLeft, Clock, DollarSign, Calendar, Tag, CheckCircle, Paperclip, Download, Upload, X, FileText, MessageSquare } from "lucide-react";
 import { Timestamp } from "firebase/firestore";
-import { TaskWorkspace } from "@/components/features/task/TaskWorkspace";
 import { storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
@@ -92,11 +91,6 @@ export default function WorkerJobDetailPage() {
     const onSubmit = async (data: ProposalFormValues) => {
         if (!user || !job) return;
         
-        if (job.type === 'competition' && files.length === 0) {
-            alert("コンペ方式では提案ファイルの添付が必須です。");
-            return;
-        }
-
         setSubmitting(true);
         try {
             const attachmentUrls = await uploadFiles(files);
@@ -118,14 +112,8 @@ export default function WorkerJobDetailPage() {
             });
             setHasApplied(true);
             
-            if (job.type === 'competition') {
-                alert("提案を提出しました！");
-                // コンペの場合はメッセージルームではなく、応募管理画面へ戻るのが一般的かも
-                router.push("/worker/applications");
-            } else {
-                alert("応募が完了しました！メッセージルームへ移動します。");
-                router.push(`/messages/${proposalId}`);
-            }
+            alert("応募が完了しました！メッセージルームへ移動します。");
+            router.push(`/messages/${proposalId}`);
         } catch (err) {
             console.error(err);
             alert("エラーが発生しました");
@@ -143,25 +131,6 @@ export default function WorkerJobDetailPage() {
 
     const removeFile = (index: number) => {
         setFiles(prev => prev.filter((_, i) => i !== index));
-    };
-
-    const handleTaskSubmit = async (answers: any[]) => {
-        if (!user || !job) return;
-        try {
-            await createTaskSubmission({
-                jobId: job.id,
-                workerId: user.uid,
-                answers,
-                status: "pending",
-                startedAt: Timestamp.now(),
-                submittedAt: Timestamp.now(),
-            });
-            setHasApplied(true);
-            alert("タスクを提出しました！");
-        } catch (err) {
-            console.error(err);
-            alert("エラーが発生しました");
-        }
     };
 
     if (loading) return <div className="p-8 text-center">読み込み中...</div>;
@@ -255,142 +224,122 @@ export default function WorkerJobDetailPage() {
                     </Card>
                 </div>
 
-                {/* Application Form or Task Workspace */}
+                {/* Application Form */}
                 <div className="space-y-6">
-                    {job.type === 'task' ? (
-                        hasApplied ? (
-                            <Card>
-                                <CardContent className="pt-6">
-                                    <div className="text-center py-8">
-                                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                            <CheckCircle className="text-green-600" size={32} />
-                                        </div>
-                                        <h3 className="text-lg font-bold text-green-800 mb-2">提出済み</h3>
-                                        <p className="text-gray-600 mb-4">このタスクは既に提出しています。</p>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-xl font-bold text-secondary">この案件に応募する</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {hasApplied ? (
+                                <div className="text-center py-8">
+                                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <CheckCircle className="text-green-600" size={32} />
                                     </div>
-                                </CardContent>
-                            </Card>
-                        ) : (
-                            <TaskWorkspace job={job} onSubmit={handleTaskSubmit} />
-                        )
-                    ) : (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-xl font-bold text-secondary">この案件に応募する</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                {hasApplied ? (
-                                    <div className="text-center py-8">
-                                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                            <CheckCircle className="text-green-600" size={32} />
-                                        </div>
-                                        <h3 className="text-lg font-bold text-green-800 mb-2">応募済み</h3>
-                                        <p className="text-gray-600 mb-4">この案件には既に応募しています。</p>
-                                        <div className="flex flex-col gap-2">
-                                            {/* コンペ方式の場合は契約ID、それ以外はproposalIdでメッセージルームへ */}
-                                            {(proposalId || contractId) && (
-                                                <Link href={`/messages/${contractId || proposalId}`}>
-                                                    <Button variant="outline" className="w-full">
-                                                        <MessageSquare size={16} className="mr-2" />
-                                                        クライアントにメッセージ
-                                                    </Button>
-                                                </Link>
-                                            )}
-                                            <Link href="/worker/applications">
-                                                <Button variant="outline" className="w-full">応募管理へ</Button>
+                                    <h3 className="text-lg font-bold text-green-800 mb-2">応募済み</h3>
+                                    <p className="text-gray-600 mb-4">この案件には既に応募しています。</p>
+                                    <div className="flex flex-col gap-2">
+                                        {(proposalId || contractId) && (
+                                            <Link href={`/messages/${contractId || proposalId}`}>
+                                                <Button variant="outline" className="w-full">
+                                                    <MessageSquare size={16} className="mr-2" />
+                                                    クライアントにメッセージ
+                                                </Button>
                                             </Link>
-                                            {contractId && (
-                                                <Link href={`/worker/contracts/${contractId}`}>
-                                                    <Button className="w-full bg-accent hover:bg-accent/90 text-white">契約詳細・納品へ</Button>
-                                                </Link>
-                                            )}
-                                        </div>
+                                        )}
+                                        <Link href="/worker/applications">
+                                            <Button variant="outline" className="w-full">応募管理へ</Button>
+                                        </Link>
+                                        {contractId && (
+                                            <Link href={`/worker/contracts/${contractId}`}>
+                                                <Button className="w-full bg-accent hover:bg-accent/90 text-white">契約詳細・納品へ</Button>
+                                            </Link>
+                                        )}
                                     </div>
-                                ) : job.status !== 'open' ? (
-                                    <div className="text-center py-8 text-gray-500">
-                                        この案件は現在募集していません。
-                                    </div>
-                                ) : (
-                                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                                </div>
+                            ) : job.status !== 'open' ? (
+                                <div className="text-center py-8 text-gray-500">
+                                    この案件は現在募集していません。
+                                </div>
+                            ) : (
+                                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                                    <Input
+                                        label="提案金額 (円)"
+                                        type="number"
+                                        placeholder="50000"
+                                        error={errors.price?.message}
+                                        {...register("price", { valueAsNumber: true })}
+                                    />
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">完了予定日</label>
                                         <Input
-                                            label="提案金額 (円)"
-                                            type="number"
-                                            placeholder="50000"
-                                            error={errors.price?.message}
-                                            {...register("price", { valueAsNumber: true })}
+                                            type="date"
+                                            error={errors.estimatedDuration?.message}
+                                            {...register("estimatedDuration")}
                                         />
+                                    </div>
 
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">完了予定日</label>
-                                            <Input
-                                                type="date"
-                                                error={errors.estimatedDuration?.message}
-                                                {...register("estimatedDuration")}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">メッセージ</label>
+                                        <textarea
+                                            className="w-full rounded-lg border border-gray-300 px-3 py-2 h-32 focus:border-primary focus:ring-1 focus:ring-primary"
+                                            placeholder="自己PRや提案内容を入力してください"
+                                            {...register("message")}
+                                        />
+                                        {errors.message && <p className="mt-1 text-sm text-danger">{errors.message.message}</p>}
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            添付ファイル (任意)
+                                        </label>
+                                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-primary transition-colors">
+                                            <input
+                                                type="file"
+                                                multiple
+                                                className="hidden"
+                                                id="proposal-file-upload"
+                                                onChange={onFileSelect}
                                             />
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">メッセージ</label>
-                                            <textarea
-                                                className="w-full rounded-lg border border-gray-300 px-3 py-2 h-32 focus:border-primary focus:ring-1 focus:ring-primary"
-                                                placeholder="自己PRや提案内容を入力してください"
-                                                {...register("message")}
-                                            />
-                                            {errors.message && <p className="mt-1 text-sm text-danger">{errors.message.message}</p>}
-                                        </div>
-
-                                        {/* File Upload for Competition or Optional for Project */}
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                {job.type === 'competition' ? '提案ファイル (必須)' : '添付ファイル (任意)'}
+                                            <label
+                                                htmlFor="proposal-file-upload"
+                                                className="cursor-pointer flex flex-col items-center justify-center gap-2"
+                                            >
+                                                <Upload className="h-6 w-6 text-gray-400" />
+                                                <span className="text-sm text-gray-600">
+                                                    ファイルを選択
+                                                </span>
                                             </label>
-                                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-primary transition-colors">
-                                                <input
-                                                    type="file"
-                                                    multiple
-                                                    className="hidden"
-                                                    id="proposal-file-upload"
-                                                    onChange={onFileSelect}
-                                                />
-                                                <label
-                                                    htmlFor="proposal-file-upload"
-                                                    className="cursor-pointer flex flex-col items-center justify-center gap-2"
-                                                >
-                                                    <Upload className="h-6 w-6 text-gray-400" />
-                                                    <span className="text-sm text-gray-600">
-                                                        ファイルを選択
-                                                    </span>
-                                                </label>
-                                            </div>
-                                            {files.length > 0 && (
-                                                <div className="mt-2 space-y-2">
-                                                    {files.map((file, index) => (
-                                                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                                                            <div className="flex items-center gap-2">
-                                                                <FileText className="h-4 w-4 text-gray-500" />
-                                                                <span className="text-sm text-gray-700 truncate max-w-[200px]">{file.name}</span>
-                                                            </div>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => removeFile(index)}
-                                                                className="text-gray-400 hover:text-danger"
-                                                            >
-                                                                <X className="h-4 w-4" />
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
                                         </div>
+                                        {files.length > 0 && (
+                                            <div className="mt-2 space-y-2">
+                                                {files.map((file, index) => (
+                                                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                                                        <div className="flex items-center gap-2">
+                                                            <FileText className="h-4 w-4 text-gray-500" />
+                                                            <span className="text-sm text-gray-700 truncate max-w-[200px]">{file.name}</span>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeFile(index)}
+                                                            className="text-gray-400 hover:text-danger"
+                                                        >
+                                                            <X className="h-4 w-4" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
 
-                                        <Button type="submit" className="w-full" disabled={submitting}>
-                                            {submitting ? "送信中..." : job.type === 'competition' ? "提案する" : "応募する"}
-                                        </Button>
-                                    </form>
-                                )}
-                            </CardContent>
-                        </Card>
-                    )}
+                                    <Button type="submit" className="w-full" disabled={submitting}>
+                                        {submitting ? "送信中..." : "応募する"}
+                                    </Button>
+                                </form>
+                            )}
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
         </div>

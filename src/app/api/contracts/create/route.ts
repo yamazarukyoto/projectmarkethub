@@ -37,6 +37,22 @@ export async function POST(req: Request) {
         const platformFee = Math.floor(price * 0.05);
         const workerAmount = price - platformFee;
 
+        // Check if contract already exists for this proposal
+        if (proposalId) {
+            const existingContracts = await adminDb.collection("contracts")
+                .where("proposalId", "==", proposalId)
+                .get();
+            
+            if (!existingContracts.empty) {
+                return NextResponse.json({ error: "Contract already exists for this proposal" }, { status: 400 });
+            }
+        }
+
+        // Check if job is already filled (prevent multiple contracts for single job)
+        if (jobData?.status !== 'open') {
+            return NextResponse.json({ error: "This job is no longer open" }, { status: 400 });
+        }
+
         // 1. Create Contract in Firestore
         // For Competition, payment is already done at Job creation, so status is 'escrow'
         const isCompetition = type === 'competition';

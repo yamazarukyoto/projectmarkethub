@@ -32,7 +32,7 @@ export function JobCard({ job, userType }: JobCardProps) {
               {job.budget.toLocaleString()}円
             </span>
             <span className="bg-gray-100 px-2 py-1 rounded text-xs">
-              {job.type === 'project' ? 'プロジェクト' : job.type === 'competition' ? 'コンペ' : 'タスク'}
+              プロジェクト
             </span>
           </div>
         </div>
@@ -44,7 +44,6 @@ export function JobCard({ job, userType }: JobCardProps) {
           }`}>
             {job.status === 'open' ? '募集中' :
              job.status === 'filled' ? '募集終了' :
-             job.status === 'selecting' ? '選定中' :
              job.status === 'closed' ? '完了' : 'キャンセル'}
           </span>
         </div>

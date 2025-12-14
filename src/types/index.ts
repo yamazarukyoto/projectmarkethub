@@ -74,30 +74,12 @@ export interface Job {
     tags: string[];
     attachments?: string[];
     
-    type: 'project' | 'competition' | 'task';
+    type: 'project';
     budgetType: 'fixed';
     budget: number;
     deadline: Timestamp;
     
-    status: 'open' | 'selecting' | 'closed' | 'filled' | 'cancelled';
-    
-    // Type specific data
-    competition?: {
-        guaranteed: boolean;
-        additionalPrizes?: number[];
-    };
-    task?: {
-        unitPrice: number;
-        quantity: number;
-        timeLimit: number;
-        questions: {
-            id: string;
-            type: 'text' | 'radio' | 'checkbox';
-            text: string;
-            options?: string[];
-            required: boolean;
-        }[];
-    };
+    status: 'open' | 'closed' | 'filled' | 'cancelled';
 
     createdAt: Timestamp;
     updatedAt: Timestamp;
@@ -139,7 +121,7 @@ export interface Contract {
     workerId: string;
     
     jobTitle: string;
-    jobType: 'project' | 'competition' | 'task';
+    jobType: 'project';
     
     amount: number;
     tax: number;
@@ -166,24 +148,6 @@ export interface Contract {
     escrowAt?: Timestamp;
     submittedAt?: Timestamp;
     completedAt?: Timestamp;
-}
-
-export interface TaskSubmission {
-    id: string;
-    jobId: string;
-    workerId: string;
-    
-    answers: {
-        questionId: string;
-        value: string | string[];
-    }[];
-    
-    status: 'working' | 'pending' | 'approved' | 'rejected';
-    rejectionReason?: string;
-    
-    startedAt: Timestamp;
-    submittedAt?: Timestamp;
-    reviewedAt?: Timestamp;
 }
 
 export interface Notification {

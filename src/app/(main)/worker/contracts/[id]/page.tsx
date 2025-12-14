@@ -63,13 +63,15 @@ export default function WorkerContractDetailPage() {
                     <ArrowLeft size={20} className="mr-2" />
                     戻る
                 </Button>
-                {/* コンペ方式の場合は契約IDをルームIDとして使用、それ以外はproposalIdを使用 */}
-                <Link href={`/messages/${contract.proposalId || contract.id}`}>
-                    <Button variant="outline">
-                        <MessageSquare size={16} className="mr-2" />
-                        メッセージ
-                    </Button>
-                </Link>
+                {/* 常にproposalIdをルームIDとして使用（契約前後でメッセージを統一） */}
+                {contract.proposalId && (
+                    <Link href={`/messages/${contract.proposalId}`}>
+                        <Button variant="outline">
+                            <MessageSquare size={16} className="mr-2" />
+                            メッセージ
+                        </Button>
+                    </Link>
+                )}
             </div>
 
             <Card>
@@ -91,14 +93,6 @@ export default function WorkerContractDetailPage() {
                         <div>
                             <h3 className="text-sm font-semibold text-gray-500 mb-1">案件名</h3>
                             <p className="text-lg font-medium">{contract.jobTitle}</p>
-                        </div>
-                        <div>
-                            <h3 className="text-sm font-semibold text-gray-500 mb-1">契約タイプ</h3>
-                            <p className="text-lg font-medium">
-                                {contract.jobType === 'project' && 'プロジェクト方式'}
-                                {contract.jobType === 'competition' && 'コンペ方式'}
-                                {contract.jobType === 'task' && 'タスク方式'}
-                            </p>
                         </div>
                         <div>
                             <h3 className="text-sm font-semibold text-gray-500 mb-1">

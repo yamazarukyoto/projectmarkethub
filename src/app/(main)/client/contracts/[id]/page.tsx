@@ -134,26 +134,33 @@ export default function ClientContractDetailPage() {
                     <ArrowLeft size={20} className="mr-2" />
                     戻る
                 </Button>
-                {/* コンペ方式の場合は契約IDをルームIDとして使用、それ以外はproposalIdを使用 */}
-                <Link href={`/messages/${contract.proposalId || contract.id}`}>
-                    <Button variant="outline">
-                        <MessageSquare size={16} className="mr-2" />
-                        メッセージ
-                    </Button>
-                </Link>
+                {/* 常にproposalIdをルームIDとして使用（契約前後でメッセージを統一） */}
+                {contract.proposalId && (
+                    <Link href={`/messages/${contract.proposalId}`}>
+                        <Button variant="outline">
+                            <MessageSquare size={16} className="mr-2" />
+                            メッセージ
+                        </Button>
+                    </Link>
+                )}
             </div>
 
             <Card>
                 <CardHeader>
                     <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                         <CardTitle className="text-2xl font-bold text-secondary">契約詳細</CardTitle>
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${contract.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                contract.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                                    'bg-yellow-100 text-yellow-800'
-                            }`}>
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+                            contract.status === 'completed' ? 'bg-green-100 text-green-800' :
+                            contract.status === 'submitted' ? 'bg-purple-100 text-purple-800' :
+                            contract.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                            contract.status === 'escrow' ? 'bg-cyan-100 text-cyan-800' :
+                            'bg-yellow-100 text-yellow-800'
+                        }`}>
                             {contract.status === 'completed' ? '完了' :
-                                contract.status === 'in_progress' ? '進行中' :
-                                    contract.status === 'escrow' ? '仮決済待ち' : contract.status}
+                             contract.status === 'submitted' ? '納品確認待ち' :
+                             contract.status === 'in_progress' ? '業務進行中' :
+                             contract.status === 'escrow' ? '仮決済済み' :
+                             contract.status === 'waiting_for_escrow' ? '仮決済待ち' : contract.status}
                         </span>
                     </div>
                 </CardHeader>
@@ -166,9 +173,7 @@ export default function ClientContractDetailPage() {
                         <div>
                             <h3 className="text-sm font-semibold text-gray-500 mb-1">契約タイプ</h3>
                             <p className="text-lg font-medium">
-                                {contract.jobType === 'project' && 'プロジェクト方式'}
-                                {contract.jobType === 'competition' && 'コンペ方式'}
-                                {contract.jobType === 'task' && 'タスク方式'}
+                                プロジェクト方式
                             </p>
                         </div>
                         <div>

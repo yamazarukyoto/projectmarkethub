@@ -156,8 +156,7 @@ export default function ClientDashboard() {
                                                         'bg-gray-100 text-gray-800'
                                                 }`}>
                                                 {job.status === 'open' ? '募集中' :
-                                                    job.status === 'filled' ? '契約中' : 
-                                                    job.status === 'selecting' ? '選定中' : '終了'}
+                                                    job.status === 'filled' ? '契約中' : '終了'}
                                             </span>
                                             <span className="text-xs text-gray-400 whitespace-nowrap">
                                                 {job.createdAt.toDate().toLocaleDateString()}

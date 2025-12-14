@@ -72,10 +72,14 @@ export async function POST(req: NextRequest) {
         targetRef = adminDb.collection("jobs").doc(jobId);
     }
 
-    // Stripeが無効またはワーカーが未連携(契約時)の場合のデモ動作
-    // コンペ・タスクの場合はワーカーID不要
-    if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'dummy_key' || (contractId && !workerStripeAccountId)) {
-      console.warn("Stripe is not configured or worker has no account. Skipping payment for demo.");
+    // Stripeが無効な場合のデモ動作（本番環境では常にStripe決済を使用）
+    // 注意: デモモードは開発環境でのみ使用
+    const isStripeConfigured = process.env.STRIPE_SECRET_KEY && 
+                               process.env.STRIPE_SECRET_KEY !== 'dummy_key' &&
+                               process.env.STRIPE_SECRET_KEY.startsWith('sk_');
+    
+    if (!isStripeConfigured) {
+      console.warn("Stripe is not configured. Skipping payment for demo.");
       
       if (contractId) {
           await targetRef?.update({

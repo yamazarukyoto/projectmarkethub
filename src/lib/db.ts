@@ -13,7 +13,7 @@ import {
     limit,
     Timestamp
 } from "firebase/firestore";
-import { User, Job, Proposal, Contract, TaskSubmission, Notification } from "@/types";
+import { User, Job, Proposal, Contract, Notification } from "@/types";
 
 // User Functions
 export const getUser = async (uid: string): Promise<User | null> => {
@@ -155,6 +155,12 @@ export const getContracts = async (userId: string, userType: 'client' | 'worker'
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Contract));
 };
 
+export const getContractsForJob = async (jobId: string): Promise<Contract[]> => {
+    const q = query(collection(db, "contracts"), where("jobId", "==", jobId));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Contract));
+};
+
 export const updateContractStatus = async (contractId: string, status: Contract["status"]): Promise<void> => {
     const docRef = doc(db, "contracts", contractId);
     await updateDoc(docRef, { status });
@@ -265,64 +271,6 @@ export const addNegotiationMessage = async (proposalId: string, message: { sende
     }
 };
 
-// Task Functions
-export const createTaskSubmission = async (submission: Omit<TaskSubmission, "id">): Promise<string> => {
-    const docRef = await addDoc(collection(db, "task_submissions"), submission);
-    
-    // Get Job to notify client
-    const jobDoc = await getDoc(doc(db, "jobs", submission.jobId));
-    if (jobDoc.exists()) {
-        const job = jobDoc.data() as Job;
-        await createNotification({
-            userId: job.clientId,
-            type: 'contract',
-            title: 'タスクが提出されました',
-            body: `${job.title}に新しいタスク提出がありました。`,
-            link: `/client/jobs/${submission.jobId}`,
-            read: false,
-            createdAt: Timestamp.now()
-        });
-    }
-
-    return docRef.id;
-};
-
-export const getTaskSubmission = async (submissionId: string): Promise<TaskSubmission | null> => {
-    const docRef = doc(db, "task_submissions", submissionId);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-        return { id: docSnap.id, ...docSnap.data() } as TaskSubmission;
-    } else {
-        return null;
-    }
-};
-
-export const getTaskSubmissionsByJob = async (jobId: string): Promise<TaskSubmission[]> => {
-    const q = query(collection(db, "task_submissions"), where("jobId", "==", jobId), orderBy("submittedAt", "desc"));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TaskSubmission));
-};
-
-export const submitTaskAnswers = async (submissionId: string, answers: TaskSubmission["answers"]): Promise<void> => {
-    const docRef = doc(db, "task_submissions", submissionId);
-    await updateDoc(docRef, {
-        answers,
-        status: 'pending',
-        submittedAt: Timestamp.now()
-    });
-};
-
-export const reviewTaskSubmission = async (submissionId: string, status: 'approved' | 'rejected', reason?: string): Promise<void> => {
-    const docRef = doc(db, "task_submissions", submissionId);
-    const updates: Partial<TaskSubmission> = {
-        status,
-        reviewedAt: Timestamp.now()
-    };
-    if (reason) {
-        updates.rejectionReason = reason;
-    }
-    await updateDoc(docRef, updates);
-};
 
 // Notification Functions
 export const createNotification = async (notification: Omit<Notification, "id">): Promise<string> => {

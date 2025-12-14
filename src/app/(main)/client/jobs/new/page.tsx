@@ -20,76 +20,11 @@ const jobSchema = z.object({
     title: z.string().min(1, "タイトルを入力してください"),
     description: z.string().min(1, "詳細を入力してください"),
     category: z.string().min(1, "カテゴリーを選択してください"),
-    type: z.enum(["project", "competition", "task"]),
+    type: z.literal("project"),
     budgetType: z.literal("fixed").optional(),
-    budget: z.number().optional(),
+    budget: z.number().min(1, "予算金額を入力してください"),
     deadline: z.string().min(1, "期限を入力してください"),
     tags: z.string(), // Comma separated
-    
-    // Task specific
-    taskQuantity: z.number().optional(),
-    taskUnitPrice: z.number().optional(),
-    taskTimeLimit: z.number().optional(),
-    taskQuestions: z.array(z.object({
-        type: z.enum(["text", "radio", "checkbox"]),
-        text: z.string().optional(),
-        options: z.string().optional(), // Comma separated for radio/checkbox
-    })).optional(),
-}).superRefine((data, ctx) => {
-    if (data.type === "task") {
-        if (!data.taskQuantity) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "件数を入力してください",
-                path: ["taskQuantity"],
-            });
-        }
-        if (!data.taskUnitPrice) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "単価を入力してください",
-                path: ["taskUnitPrice"],
-            });
-        }
-        if (!data.taskTimeLimit) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "制限時間を入力してください",
-                path: ["taskTimeLimit"],
-            });
-        }
-        if (data.taskQuestions) {
-            data.taskQuestions.forEach((q, index) => {
-                if (!q.text || q.text.length < 1) {
-                    ctx.addIssue({
-                        code: z.ZodIssueCode.custom,
-                        message: "設問を入力してください",
-                        path: ["taskQuestions", index, "text"],
-                    });
-                }
-            });
-        }
-    }
-    
-    if (data.type === "project") {
-        if (!data.budget) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "予算金額を入力してください",
-                path: ["budget"],
-            });
-        }
-    }
-
-    if (data.type === "competition") {
-        if (!data.budget) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "採用報酬額を入力してください",
-                path: ["budget"],
-            });
-        }
-    }
 });
 
 type JobFormValues = z.infer<typeof jobSchema>;
@@ -109,28 +44,19 @@ export default function PostJobPage() {
     const {
         register,
         handleSubmit,
-        watch,
         setValue,
-        control,
         formState: { errors },
     } = useForm<JobFormValues>({
         resolver: zodResolver(jobSchema),
         defaultValues: {
             type: "project",
             budgetType: "fixed",
-            taskQuestions: [{ type: "text", text: "" }],
         },
     });
 
-    const { fields, append, remove } = useFieldArray({
-        control,
-        name: "taskQuestions",
-    });
-
-    const selectedType = watch("type");
-
     useEffect(() => {
         setValue("budgetType", "fixed");
+        setValue("type", "project");
     }, [setValue]);
 
     const onDragOver = useCallback((e: React.DragEvent) => {
@@ -197,51 +123,23 @@ export default function PostJobPage() {
                 title: pendingJobData.title,
                 description: pendingJobData.description,
                 category: pendingJobData.category,
-                type: pendingJobData.type,
-                budgetType: pendingJobData.budgetType,
+                type: "project",
+                budgetType: "fixed",
+                budget: pendingJobData.budget,
                 deadline: Timestamp.fromDate(new Date(pendingJobData.deadline)),
-                status: pendingJobData.type === "project" ? "open" : "draft", // コンペ・タスクは仮払い待ちのためdraft
+                status: "open",
                 createdAt: Timestamp.now(),
                 updatedAt: Timestamp.now(),
                 tags: pendingJobData.tags.split(",").map(t => t.trim()).filter(t => t),
                 attachments: attachmentUrls,
             };
 
-            if (pendingJobData.type === "project") {
-                jobData.budget = pendingJobData.budget;
-            } else if (pendingJobData.type === "competition") {
-                jobData.budget = pendingJobData.budget;
-                jobData.competition = {
-                    guaranteed: false, // Default
-                };
-            } else if (pendingJobData.type === "task") {
-                jobData.budget = (pendingJobData.taskQuantity || 0) * (pendingJobData.taskUnitPrice || 0);
-                jobData.task = {
-                    quantity: pendingJobData.taskQuantity,
-                    unitPrice: pendingJobData.taskUnitPrice,
-                    timeLimit: pendingJobData.taskTimeLimit,
-                    questions: pendingJobData.taskQuestions?.map(q => ({
-                        type: q.type,
-                        text: q.text,
-                        options: q.options ? q.options.split(",").map(o => o.trim()) : undefined,
-                    })),
-                };
-            }
-
             console.log("Creating job...", jobData);
             const jobId = await createJob(jobData);
             console.log("Job created successfully", jobId);
 
-            if (pendingJobData.type === "project") {
-                alert("依頼を投稿しました！");
-                router.push("/client/dashboard");
-            } else {
-                // コンペ・タスクの場合は仮決済へ
-                setCreatedJobId(jobId);
-                // 税込金額を計算して渡す
-                const taxIncludedAmount = Math.floor(jobData.budget * 1.1);
-                await handlePayment(jobId, taxIncludedAmount);
-            }
+            alert("依頼を投稿しました！");
+            router.push("/client/dashboard");
         } catch (err) {
             console.error("Error creating job:", err);
             alert(`エラーが発生しました: ${err instanceof Error ? err.message : "不明なエラー"}`);
@@ -320,22 +218,7 @@ export default function PostJobPage() {
                             {...register("title")}
                         />
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">依頼形式</label>
-                            <select
-                                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-primary focus:ring-1 focus:ring-primary"
-                                {...register("type")}
-                            >
-                                <option value="project">プロジェクト方式</option>
-                                <option value="competition">コンペ方式</option>
-                                <option value="task">タスク方式</option>
-                            </select>
-                            <p className="text-xs text-gray-500 mt-1">
-                                {selectedType === "project" && "特定の一人と契約して仕事を進める形式です。"}
-                                {selectedType === "competition" && "多数の提案を集めて採用する形式です。"}
-                                {selectedType === "task" && "多数のワーカーに単純作業を依頼する形式です。"}
-                            </p>
-                        </div>
+                        <input type="hidden" {...register("type")} value="project" />
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">詳細</label>
@@ -424,91 +307,16 @@ export default function PostJobPage() {
                             </div>
                         </div>
 
-                        {/* Project Format Budget */}
-                        {selectedType === "project" && (
-                            <div className="space-y-4 border-t pt-4">
-                                <h3 className="font-medium text-gray-900">報酬設定</h3>
-                                <Input
-                                    label="予算金額 (円)"
-                                    type="number"
-                                    placeholder="50000"
-                                    error={errors.budget?.message}
-                                    {...register("budget", { valueAsNumber: true })}
-                                />
-                            </div>
-                        )}
-
-                        {/* Competition Format Budget */}
-                        {selectedType === "competition" && (
-                            <div className="space-y-4 border-t pt-4">
-                                <h3 className="font-medium text-gray-900">コンペ設定</h3>
-                                <Input
-                                    label="採用報酬額 (円)"
-                                    type="number"
-                                    placeholder="30000"
-                                    error={errors.budget?.message}
-                                    {...register("budget", { valueAsNumber: true })}
-                                />
-                            </div>
-                        )}
-
-                        {/* Task Format Settings */}
-                        {selectedType === "task" && (
-                            <div className="space-y-4 border-t pt-4">
-                                <h3 className="font-medium text-gray-900">タスク設定</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <Input
-                                        label="単価 (円)"
-                                        type="number"
-                                        placeholder="50"
-                                        {...register("taskUnitPrice", { valueAsNumber: true })}
-                                    />
-                                    <Input
-                                        label="件数"
-                                        type="number"
-                                        placeholder="100"
-                                        {...register("taskQuantity", { valueAsNumber: true })}
-                                    />
-                                    <Input
-                                        label="制限時間 (分)"
-                                        type="number"
-                                        placeholder="60"
-                                        {...register("taskTimeLimit", { valueAsNumber: true })}
-                                    />
-                                </div>
-                                
-                                <div className="space-y-2">
-                                    <label className="block text-sm font-medium text-gray-700">設問</label>
-                                    {fields.map((field, index) => (
-                                        <div key={field.id} className="p-4 border rounded-lg space-y-2 bg-gray-50">
-                                            <div className="flex justify-between">
-                                                <span className="text-sm font-bold">設問 {index + 1}</span>
-                                                <button type="button" onClick={() => remove(index)} className="text-xs text-danger">削除</button>
-                                            </div>
-                                            <select
-                                                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                                                {...register(`taskQuestions.${index}.type`)}
-                                            >
-                                                <option value="text">テキスト入力</option>
-                                                <option value="radio">選択式 (単一)</option>
-                                                <option value="checkbox">選択式 (複数)</option>
-                                            </select>
-                                            <Input
-                                                placeholder="質問文を入力"
-                                                {...register(`taskQuestions.${index}.text`)}
-                                            />
-                                            <Input
-                                                placeholder="選択肢 (カンマ区切り: A,B,C)"
-                                                {...register(`taskQuestions.${index}.options`)}
-                                            />
-                                        </div>
-                                    ))}
-                                    <Button type="button" variant="outline" size="sm" onClick={() => append({ type: "text", text: "" })}>
-                                        + 設問を追加
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
+                        <div className="space-y-4 border-t pt-4">
+                            <h3 className="font-medium text-gray-900">報酬設定</h3>
+                            <Input
+                                label="予算金額 (円)"
+                                type="number"
+                                placeholder="50000"
+                                error={errors.budget?.message}
+                                {...register("budget", { valueAsNumber: true })}
+                            />
+                        </div>
 
                         <Input
                             label="タグ (カンマ区切り)"
@@ -554,11 +362,7 @@ export default function PostJobPage() {
                             </div>
                             <div>
                                 <h4 className="text-sm font-bold text-gray-500">依頼形式</h4>
-                                <p>
-                                    {pendingJobData.type === "project" && "プロジェクト方式"}
-                                    {pendingJobData.type === "competition" && "コンペ方式"}
-                                    {pendingJobData.type === "task" && "タスク方式"}
-                                </p>
+                                <p>プロジェクト方式</p>
                             </div>
                             <div>
                                 <h4 className="text-sm font-bold text-gray-500">カテゴリー</h4>
@@ -571,55 +375,21 @@ export default function PostJobPage() {
 
                             <div className="bg-gray-50 p-4 rounded-lg border">
                                 <h4 className="text-sm font-bold text-gray-900 mb-2">お支払い金額（概算）</h4>
-                                {pendingJobData.type === "project" ? (
-                                    <div className="space-y-1">
-                                        <div className="flex justify-between text-sm">
-                                            <span>予算金額 (税抜)</span>
-                                            <span>{pendingJobData.budget?.toLocaleString()} 円</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span>消費税 (10%)</span>
-                                            <span>{Math.floor((pendingJobData.budget || 0) * 0.1).toLocaleString()} 円</span>
-                                        </div>
-                                        <div className="flex justify-between font-bold text-lg border-t pt-2 mt-2">
-                                            <span>合計</span>
-                                            <span>{Math.floor((pendingJobData.budget || 0) * 1.1).toLocaleString()} 円</span>
-                                        </div>
-                                        <p className="text-xs text-gray-500 mt-2">※プロジェクト方式の場合、実際の契約金額はワーカーとの交渉により決定します。この段階では支払いは発生しません。</p>
+                                <div className="space-y-1">
+                                    <div className="flex justify-between text-sm">
+                                        <span>予算金額 (税抜)</span>
+                                        <span>{pendingJobData.budget?.toLocaleString()} 円</span>
                                     </div>
-                                ) : pendingJobData.type === "competition" ? (
-                                    <div className="space-y-1">
-                                        <div className="flex justify-between text-sm">
-                                            <span>採用報酬額 (税抜)</span>
-                                            <span>{pendingJobData.budget?.toLocaleString()} 円</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span>消費税 (10%)</span>
-                                            <span>{Math.floor((pendingJobData.budget || 0) * 0.1).toLocaleString()} 円</span>
-                                        </div>
-                                        <div className="flex justify-between font-bold text-lg border-t pt-2 mt-2">
-                                            <span>合計（仮決済金額）</span>
-                                            <span>{Math.floor((pendingJobData.budget || 0) * 1.1).toLocaleString()} 円</span>
-                                        </div>
-                                        <p className="text-xs text-gray-500 mt-2">※コンペ方式の場合、募集開始時に仮決済が必要です。</p>
+                                    <div className="flex justify-between text-sm">
+                                        <span>消費税 (10%)</span>
+                                        <span>{Math.floor((pendingJobData.budget || 0) * 0.1).toLocaleString()} 円</span>
                                     </div>
-                                ) : (
-                                    <div className="space-y-1">
-                                        <div className="flex justify-between text-sm">
-                                            <span>単価 {pendingJobData.taskUnitPrice?.toLocaleString()}円 × {pendingJobData.taskQuantity}件</span>
-                                            <span>{((pendingJobData.taskUnitPrice || 0) * (pendingJobData.taskQuantity || 0)).toLocaleString()} 円</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span>消費税 (10%)</span>
-                                            <span>{Math.floor(((pendingJobData.taskUnitPrice || 0) * (pendingJobData.taskQuantity || 0)) * 0.1).toLocaleString()} 円</span>
-                                        </div>
-                                        <div className="flex justify-between font-bold text-lg border-t pt-2 mt-2">
-                                            <span>合計（仮決済金額）</span>
-                                            <span>{Math.floor(((pendingJobData.taskUnitPrice || 0) * (pendingJobData.taskQuantity || 0)) * 1.1).toLocaleString()} 円</span>
-                                        </div>
-                                        <p className="text-xs text-gray-500 mt-2">※タスク方式の場合、募集開始時に仮決済が必要です。</p>
+                                    <div className="flex justify-between font-bold text-lg border-t pt-2 mt-2">
+                                        <span>合計</span>
+                                        <span>{Math.floor((pendingJobData.budget || 0) * 1.1).toLocaleString()} 円</span>
                                     </div>
-                                )}
+                                    <p className="text-xs text-gray-500 mt-2">※プロジェクト方式の場合、実際の契約金額はワーカーとの交渉により決定します。この段階では支払いは発生しません。</p>
+                                </div>
                             </div>
 
                             <div className="flex justify-end gap-4 pt-4">
@@ -627,7 +397,7 @@ export default function PostJobPage() {
                                     修正する
                                 </Button>
                                 <Button onClick={handleConfirmSubmit} disabled={isLoading}>
-                                    {pendingJobData.type === "project" ? "依頼を投稿する" : "仮決済へ進む"}
+                                    依頼を投稿する
                                 </Button>
                             </div>
                         </div>

@@ -27,6 +27,7 @@ export default function MessageRoomPage() {
     const [negotiationMessage, setNegotiationMessage] = useState("");
     const [isNegotiating, setIsNegotiating] = useState(false);
     const [isContractRoom, setIsContractRoom] = useState(false);
+    const [isRoomReady, setIsRoomReady] = useState(false);
 
     useEffect(() => {
         if (!roomId || !user) return;
@@ -97,6 +98,7 @@ export default function MessageRoomPage() {
                             updatedAt: serverTimestamp()
                         });
                     }
+                    setIsRoomReady(true);
                 } catch (error) {
                     console.error("Error checking/creating room:", error);
                 }
@@ -121,6 +123,7 @@ export default function MessageRoomPage() {
                             updatedAt: serverTimestamp()
                         });
                     }
+                    setIsRoomReady(true);
                 } catch (error) {
                     console.error("Error checking/creating room:", error);
                 }
@@ -207,7 +210,13 @@ export default function MessageRoomPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
                     {/* Main Chat Area */}
                     <div className="lg:col-span-2 h-full">
-                        <ChatBox roomId={roomId} currentUserId={user.uid} />
+                        {isRoomReady ? (
+                            <ChatBox roomId={roomId} currentUserId={user.uid} />
+                        ) : (
+                            <div className="flex items-center justify-center h-full bg-gray-50 rounded-xl border">
+                                <p className="text-gray-500">チャットルームを準備中...</p>
+                            </div>
+                        )}
                     </div>
 
                     {/* Contract Info Panel (Sidebar) */}
@@ -314,7 +323,13 @@ export default function MessageRoomPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
                 {/* Main Chat Area */}
                 <div className="lg:col-span-2 h-full">
-                    <ChatBox roomId={roomId} currentUserId={user.uid} />
+                    {isRoomReady ? (
+                        <ChatBox roomId={roomId} currentUserId={user.uid} />
+                    ) : (
+                        <div className="flex items-center justify-center h-full bg-gray-50 rounded-xl border">
+                            <p className="text-gray-500">チャットルームを準備中...</p>
+                        </div>
+                    )}
                 </div>
 
                 {/* Condition Panel (Sidebar) */}
@@ -386,6 +401,19 @@ export default function MessageRoomPage() {
                                     </Button>
                                     <p className="text-xs text-gray-500 mt-2 text-center">
                                         契約を作成し、仮決済へ進みます。
+                                    </p>
+                                </div>
+                            )}
+                            
+                            {/* Worker View: Show status if hired */}
+                            {!isClient && (proposal.status === 'hired' || proposal.status === 'adopted') && (
+                                <div className="pt-4 border-t">
+                                    <div className="bg-green-50 text-green-800 p-3 rounded-lg text-center text-sm font-bold">
+                                        <CheckCircle size={16} className="inline mr-1" />
+                                        契約済み
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-2 text-center">
+                                        契約管理ページから詳細を確認してください。
                                     </p>
                                 </div>
                             )}

@@ -1,10 +1,11 @@
-# クラウドソーシングプラットフォーム「Project Market Hub」詳細開発仕様書 (Ver 5.1)
+# クラウドソーシングプラットフォーム「Project Market Hub」詳細開発仕様書 (Ver 6.0)
 
 ## 1. プロジェクト定義 & コアコンセプト
 
 ### 1.1 概要
 本プロジェクトは、クライアント（発注者）とワーカー（受注者）をマッチングするクラウドソーシングプラットフォーム**「Project Market Hub」**である。
 最大の特徴は、**「単一アカウント・デュアルモード」**システムである。ユーザーはログアウトすることなく、ヘッダーのスイッチ一つで「クライアントモード」と「ワーカーモード」を瞬時に切り替えられる。
+**本プラットフォームでは、業務委託形式として「プロジェクト方式（固定報酬制）」のみを採用する。**
 
 ### 1.2 デザインシステム & UI規定
 **コンセプト:** 「信頼 (Trust)」「清涼 (Clean)」「知性 (Intelligence)」
@@ -70,9 +71,7 @@
       |     |     +-- Job List (/client/jobs)
       |     |     +-- Job Detail (/client/jobs/[id])
       |     |           +-- Edit Job
-      |     |           +-- Applicant List (Project)
-      |     |           +-- Proposal List (Competition)
-      |     |           +-- Task Approvals (Task)
+      |     |           +-- Applicant List
       |     |
       |     +-- Contract Management
       |           +-- Contract Detail (/client/contracts/[id])
@@ -142,12 +141,12 @@
     v                                     v                                     v
 ```
 
-CrowdWorksの仕様に準拠し、以下の3方式を実装する。**時間単価制は採用しない。**
+本プラットフォームでは、**プロジェクト方式（固定報酬制）**を採用する。時間単価制は採用しない。
 全てのフローにおいて、**「仮決済（決済予約）」**が必須であり、ワーカーの報酬未払いリスクを排除する。
 **法的解釈:** クライアントが仮決済を行った時点で、ワーカーへの支払い義務は履行（完了）したものとみなす。プラットフォームはワーカーからの委託を受けて代金を**代理受領（収納代行）**し、検収完了までその決済を保全する。
 
 ### 2.1 プロジェクト方式（固定報酬制 - Fixed Price）
-最も汎用的な形式。要件定義から納品まで、1対1（または1対多）で進行する。
+要件定義から納品まで、1対1（または1対多）で進行する形式。
 
 #### 状態遷移図 (State Machine)
 ```mermaid
@@ -243,7 +242,6 @@ stateDiagram-v2
                 *   クリックで確認モーダル表示：「検収を完了しますか？これによりワーカーへの報酬引き渡しが確定します。」
                 *   「確定する」ボタン押下で `/api/contracts/complete` をコール。
     *   **System:** `/api/contracts/complete` (または `/api/stripe/capture-payment-intent`)。
-        *   ※現状のコードベースでは `capture-payment-intent` が実装されているが、業務フロー的には `contracts/complete` が適切。
 9.  **評価 (Both)**
     *   **Page:** `/client/contracts/[id]` / `/worker/contracts/[id]`
     *   **UI:**
@@ -252,120 +250,7 @@ stateDiagram-v2
 
 ---
 
-### 2.2 コンペ方式（Competition Format）
-「ロゴ作成」や「ネーミング」など、多数の案から選びたい場合。
-**特徴:** 募集開始時に「仮決済」を行い、採用決定時に「決済確定」を行う。
-
-#### 状態遷移図
-```mermaid
-stateDiagram-v2
-    [*] --> Open: 募集開始(仮決済済)
-    Open --> Selecting: 募集終了
-    Selecting --> Closed: 採用決定
-    Closed --> [*]: 納品・検収完了
-```
-
-#### 詳細ステップ & 画面UI仕様
-
-1.  **募集作成 (Client)**
-    *   **Page:** `/client/jobs/new`
-    *   **UI:**
-        *   `JobTypeSelector`: 「コンペ方式」を選択。
-        *   `JobForm`: タイトル、詳細、カテゴリ、**契約金額（予算）**を入力。
-        *   `ConfirmButton`: 「確認画面へ進む」ボタン。
-2.  **仮決済 & 公開 (Client)**
-    *   **Page:** `/client/jobs/new/confirm` (または確認モーダル)
-    *   **UI:**
-        *   募集内容のプレビュー表示。
-        *   `PaymentSection`: 「支払い金額：¥〇〇,〇〇〇（税込）」の表示。
-        *   `PublishButton`: **「仮決済して募集を開始する」ボタン**。
-            *   **Action:** クリックで `PaymentModal` (Stripe Elements) が表示される。
-            *   **Stripe Flow:**
-                1.  カード情報入力 → 支払い実行。
-                2.  決済成功 (`PaymentIntent` 完了) をトリガーに、`jobs` データを `status: 'open'` で作成。
-    *   **System:** 即時決済。代金はプラットフォームが代理受領する。
-3.  **提案 (Worker)**
-    *   **Page:** `/worker/jobs/[id]`
-    *   **UI:**
-        *   `ProposalForm`: 作品画像アップロード、提案コメント。
-        *   `SubmitButton`: 「提案する」。
-4.  **選定 & 採用 (Client)**
-    *   **Page:** `/client/jobs/[id]`
-    *   **UI:**
-        *   `ProposalList`: 提案一覧。
-        *   `AdoptButton`: 特定の提案詳細画面で**「この提案を採用する」ボタン**。
-            *   確認モーダル：「この作品で確定しますか？（契約が作成され、納品フェーズへ移行します）」
-    *   **DB:** `contracts` 作成 (`status: 'submitted'` - 納品待ち)。
-5.  **納品 (Worker)**
-    *   **Page:** `/worker/contracts/[id]` (採用後に生成される契約詳細ページ)
-    *   **UI:**
-        *   `DeliveryForm`: 「正式な納品データ（高解像度・透かしなし）」をアップロード。
-        *   ※コンペの場合、提案時のデータで良ければスキップも可能だが、トラブル防止のため正式納品フローを挟む。
-6.  **検収 & 決済確定 (Client)**
-    *   **Page:** `/client/contracts/[id]`
-    *   **UI:**
-        *   `DeliveryCheck`: 正式データを確認。
-        *   `CompleteButton`: **「検収完了（報酬引き渡し）」ボタン**。
-    *   **System:** Stripe Transfer実行。採用されたワーカーへ報酬が引き渡される。
-    *   **Refund:** 募集期間終了後、採用枠が埋まらなかった場合やキャンセル時は、残額をクライアントへ決済キャンセル（返金）する。
-
----
-
-### 2.3 タスク方式（Task Format）
-「アンケート」や「データ入力」など、単純作業の大量発注。
-**特徴:** 募集開始時に「総額（単価×件数）」を仮決済し、作業承認ごとに「決済確定」を行う。
-
-#### 状態遷移図
-```mermaid
-stateDiagram-v2
-    [*] --> Open: 募集開始(仮決済済)
-    Open --> Working: 作業開始(Worker)
-    Working --> Pending: 作業提出
-    Pending --> Approved: 承認(報酬発生)
-    Pending --> Rejected: 非承認
-    Approved --> [*]
-    Rejected --> [*]
-```
-
-#### 詳細ステップ & 画面UI仕様
-
-1.  **募集作成 (Client)**
-    *   **Page:** `/client/jobs/new`
-    *   **UI:**
-        *   `JobTypeSelector`: 「タスク方式」を選択。
-        *   `TaskBuilder`: 単価、件数、制限時間、設問フォームを作成。
-        *   `BudgetPreview`: 合計金額（単価×件数＋消費税）の自動計算表示。
-        *   `ConfirmButton`: 「確認画面へ進む」ボタン。
-2.  **仮決済 & 公開 (Client)**
-    *   **Page:** `/client/jobs/new/confirm`
-    *   **UI:**
-        *   タスク内容と合計金額の確認。
-        *   `PublishButton`: **「仮決済して募集を開始する」ボタン**。
-            *   **Action:** クリックで `PaymentModal` (Stripe Elements) が表示される。
-            *   **Stripe Flow:**
-                1.  総額を決済 (`PaymentIntent`)。
-                2.  決済成功後、`jobs` を `status: 'open'` で作成。
-3.  **作業実施 (Worker)**
-    *   **Page:** `/worker/jobs/[id]`
-    *   **UI:**
-        *   `StartButton`: 「作業を開始する」ボタン。
-            *   クリックで作業画面へ遷移（`task_submissions` 作成、在庫確保）。
-        *   `TaskWorkspace`: 制限時間内に回答を入力し、「作業を完了して提出する」ボタン押下。
-4.  **承認 & 決済確定 (Client)**
-    *   **Page:** `/client/jobs/[id]` (タスク管理タブ)
-    *   **UI:**
-        *   `SubmissionList`: 提出された作業の一覧。
-        *   `ApproveButton`: 各行の**「承認」ボタン**。
-            *   **Action:** クリックすると即座にその作業分の報酬（単価）がワーカーへ引き渡される。
-            *   **System:** `/api/tasks/approve` → Stripe Transfer実行（単価分のみ）。
-        *   `RejectButton`: 「非承認」ボタン（理由入力必須）。報酬は支払われない。
-5.  **完了 & 決済キャンセル (System)**
-    *   **Trigger:** 募集期間終了、または全件承認完了。
-    *   **System:** 未消化分の予算（非承認分や応募不足分）がある場合、クライアントへ `Refund` 処理を行う。
-
----
-
-## 2.4 決済・収納代行詳細仕様 (Payment & Agency Receipt Deep Dive)
+## 2.2 決済・収納代行詳細仕様 (Payment & Agency Receipt Deep Dive)
 
 本プラットフォームの核となる決済システムは、**Stripe Connect (Separate Charges and Transfers)** モデルを採用する。
 法的には、プラットフォームはワーカーから「代理受領権」を付与され、クライアントからの報酬支払いを**収納代行**する。
@@ -377,7 +262,6 @@ stateDiagram-v2
     *   検収完了後、プラットフォームからワーカーへ報酬を引き渡す（Stripe Transfer）。
     *   これにより、資金決済法上の「資金移動業」には該当せず、商取引の決済代行として適法に運用する。
 2.  **長期案件への対応:** 通常のオーソリ（`capture_method: manual`）は7日間で期限切れとなるため、数週間〜数ヶ月に及ぶプロジェクト方式には不向きである。一度決済を完了させプラットフォーム管理下の資金として保持することで、期間の制限なく決済保全状態を維持できる。
-3.  **柔軟な送金先:** コンペやタスク方式では、仮決済時点でワーカー（送金先）が未定である。プラットフォーム代理受領とすることで、後から決定したワーカーへ報酬引き渡しが可能となる。
 
 ### 金額計算シミュレーション (Financial Calculation)
 
@@ -396,19 +280,13 @@ stateDiagram-v2
 | **F. システム手数料 (税込)** | `D + E` | 550 円 | |
 | **G. ワーカー受取額** | `C - F` | **10,450 円** | **報酬引渡金額 (Transfer Amount)** |
 
-**検証:**
-*   ワーカー視点: 10,000円(税抜)の仕事をして、11,000円(税込)を受け取る権利があるが、そこから手数料550円(税込)が引かれる。
-*   `11,000 - 550 = 10,450`。整合性は取れている。
-
 ### Stripe API 実装詳細
 
 #### 1. 仮決済 (Charge / PaymentIntent)
 クライアントが支払うフェーズ。
 
 *   **API:** `stripe.paymentIntents.create`
-*   **タイミング:**
-    *   **プロジェクト:** 契約締結後、クライアントが「仮決済」ボタンを押した時。
-    *   **コンペ/タスク:** 募集作成の最終確認画面で「公開」ボタンを押した時。
+*   **タイミング:** 契約締結後、クライアントが「仮決済」ボタンを押した時。
 *   **パラメータ:**
     ```javascript
     {
@@ -418,23 +296,20 @@ stateDiagram-v2
       transfer_group: '{jobId}', // 重要: 案件IDでグルーピングし、後で紐付ける
       metadata: {
         jobId: '{jobId}',
-        contractId: '{contractId}', // プロジェクト方式の場合
+        contractId: '{contractId}',
         type: 'escrow' // システム内部識別子としてのescrow（法的には収納代行）
       }
     }
     ```
 *   **UI挙動:**
     *   `PaymentModal` (Stripe Elements) を表示。
-    *   決済成功時、DBのステータスを更新 (`waiting_for_escrow` -> `escrow` / `open`)。
+    *   決済成功時、DBのステータスを更新 (`waiting_for_escrow` -> `escrow`)。
 
 #### 2. 決済確定・報酬引渡 (Transfer)
 ワーカーへ報酬を引き渡すフェーズ。
 
 *   **API:** `stripe.transfers.create`
-*   **タイミング:**
-    *   **プロジェクト:** クライアントが「検収完了」ボタンを押した時。
-    *   **コンペ:** クライアントが「採用」を確定し、納品確認を完了した時。
-    *   **タスク:** クライアントが作業を「承認」した時。
+*   **タイミング:** クライアントが「検収完了」ボタンを押した時。
 *   **前提条件 (Pre-conditions):**
     *   ワーカーの `stripeAccountId` が存在し、Onboarding (本人確認) が完了していること (`charges_enabled: true`)。
     *   プラットフォームのStripe残高が十分にあること。
@@ -460,10 +335,7 @@ stateDiagram-v2
 キャンセルや余剰予算の返還フェーズ。
 
 *   **API:** `stripe.refunds.create`
-*   **タイミング:**
-    *   **プロジェクト:** 契約キャンセル合意時。
-    *   **コンペ:** 募集期間終了後、採用なしの場合。
-    *   **タスク:** 募集終了後、未消化予算がある場合。
+*   **タイミング:** 契約キャンセル合意時。
 *   **パラメータ:**
     ```javascript
     {
@@ -494,55 +366,9 @@ stateDiagram-v2
 3.  **整合性担保 (Idempotency):**
     *   Stripe API呼び出し時には `Idempotency-Key` (冪等キー) を付与し、ネットワークエラー等による二重決済・二重送金を確実に防ぐ。キーには `contractId` や `submissionId` を含める。
 
-### 各方式における詳細フローとステータス遷移
-
-#### A. プロジェクト方式（固定報酬）
-1.  **仮決済:** 契約 (`contracts`) ごとに `PaymentIntent` を作成。
-    *   Status: `waiting_for_escrow` -> `escrow`
-    *   **Guard:** 仮決済完了まで、ワーカー側の「納品する」ボタンは **Disabled (非活性)** とする。
-2.  **業務・納品:** ワーカーが納品。
-    *   Status: `escrow` -> `submitted`
-3.  **検収・決済確定:** クライアントが検収。`Transfer` を実行。
-    *   Status: `submitted` -> `completed`
-    *   **Guard:** 検収完了後、クライアントは返金を要求できない（Stripe上もRefund不可とする）。
-4.  **キャンセル:**
-    *   **業務開始前:** 全額返金 (`Refund`)。
-    *   **業務途中:** 話し合いにより決定した金額をワーカーへ `Transfer` し、残額をクライアントへ `Refund`。
-    *   Status: `*` -> `cancelled`
-    *   **Guard:** ワーカーが「納品済み」の場合、クライアント単独でのキャンセルは不可（ワーカーの合意アクションが必要）。
-
-#### B. コンペ方式
-1.  **仮決済:** 募集 (`jobs`) 作成時に予算全額を `PaymentIntent` で決済。
-    *   Status: `draft` -> `open`
-2.  **選定:** 募集終了後、採用作品を決定。
-    *   Status: `open` -> `selecting`
-3.  **採用・納品:** 採用ワーカーと契約作成。納品データを提出。
-    *   Contract Status: `waiting_for_delivery` -> `submitted`
-    *   **Guard:** 採用決定ボタン押下時、確認モーダルで「採用により契約が成立し、支払い義務が発生します」と明示。
-4.  **検収・決済確定:** 納品データ確認後、採用ワーカーへ `Transfer`。
-    *   Contract Status: `submitted` -> `completed`
-    *   Job Status: `selecting` -> `closed`
-5.  **返金:**
-    *   募集終了時、`仮決済額 - 送金済み総額` を計算し、残額があれば自動的に `Refund` 処理を行うバッチを実行。
-
-#### C. タスク方式
-1.  **仮決済:** 募集 (`jobs`) 作成時に `単価 × 件数` の総額を `PaymentIntent` で決済。
-    *   Status: `draft` -> `open`
-2.  **作業:** ワーカーが作業提出。
-    *   Submission Status: `working` -> `pending`
-    *   **Guard:** 同一ワーカーによる連続投稿制限（短時間の大量投稿はBotの可能性があるため、reCAPTCHA等で対策）。
-3.  **承認・決済確定:**
-    *   クライアントが1件承認するごとに、その作業のワーカーへ `単価` 分を `Transfer`。
-    *   即時性が求められるため、承認ボタン押下時に同期的にAPIをコールする。
-    *   Submission Status: `pending` -> `approved`
-    *   **Guard:** 一度「承認」した作業は取り消し不可。
-4.  **返金:**
-    *   募集終了時、またはクライアントによる早期終了時、`仮決済額 - 承認済み総額` を計算し、残額を `Refund`。
-    *   Job Status: `open` -> `closed`
-
 ---
 
-## 2.5 不正防止・トラブル対策 (Security & Anti-Fraud)
+## 2.3 不正防止・トラブル対策 (Security & Anti-Fraud)
 
 ユーザー目線での「抜け道」やリスクを排除するためのシステム的対策。
 
@@ -562,15 +388,8 @@ stateDiagram-v2
 *   **リスク:** クライアントが納品ファイルをダウンロードした後、不当に検収を拒否・キャンセルする。
 *   **対策:**
     *   **キャンセル制限:** ステータスが `submitted` (納品済み) の場合、クライアント側からのキャンセルボタンを非表示にする。キャンセルするには「トラブル報告」を行い、ワーカーの合意または運営の介入を必須とする。
-    *   **透かし (Watermark):** コンペの提案段階などの画像には、自動的に「SAMPLE」等の透かしを入れる処理を検討（将来実装）。
 
-### 4. タスク方式の不当な非承認
-*   **リスク:** 成果物を利用しつつ「非承認」にして報酬を支払わない。
-*   **対策:**
-    *   **理由必須:** 非承認にする際は、必ず理由を選択または入力させる。
-    *   **非承認率の可視化:** クライアントのプロフィールに「タスク承認率」を表示し、ワーカーがブラックなクライアントを避けられるようにする。
-
-### 5. マネーロンダリング・自作自演対策
+### 4. マネーロンダリング・自作自演対策
 *   **リスク:** 不正な資金移動や、評価の水増し。
 *   **対策:**
     *   **本人確認:** 報酬を受け取るワーカーだけでなく、高額発注を行うクライアントにもStripe Identityによる本人確認を求める場合がある。
@@ -578,7 +397,7 @@ stateDiagram-v2
 
 ---
 
-## 2.6 メッセージ機能詳細 (Messaging System Deep Dive)
+## 2.4 メッセージ機能詳細 (Messaging System Deep Dive)
 
 ### 1. 基本仕様
 *   **形式:** 1対1のチャットルーム形式（案件ごとのルーム、またはユーザー間のダイレクトメッセージ）。
@@ -612,7 +431,7 @@ stateDiagram-v2
 
 ---
 
-## 2.7 評価システム詳細 (Rating System Deep Dive)
+## 2.5 評価システム詳細 (Rating System Deep Dive)
 
 ### 1. 評価項目 (Criteria)
 5段階評価（1: 悪い 〜 5: 非常に良い）。
@@ -642,7 +461,7 @@ stateDiagram-v2
 
 ---
 
-## 2.8 キャンセルポリシー詳細 (Cancellation Policy Deep Dive)
+## 2.6 キャンセルポリシー詳細 (Cancellation Policy Deep Dive)
 
 ### 1. フェーズ別キャンセル規定
 
@@ -661,7 +480,7 @@ stateDiagram-v2
 
 ---
 
-## 2.9 管理画面機能要件 (Admin Dashboard Requirements)
+## 2.7 管理画面機能要件 (Admin Dashboard Requirements)
 
 運営者がプラットフォームを健全に保つための管理機能。`/admin/*` 配下に配置し、特定の管理者権限を持つユーザーのみアクセス可能とする。
 
@@ -688,14 +507,13 @@ stateDiagram-v2
 
 ---
 
-## 2.10 バッチ処理・自動化 (Scheduled Functions)
+## 2.8 バッチ処理・自動化 (Scheduled Functions)
 
 Cloud Functions for Firebase (Pub/Sub Scheduler) を利用した定期実行処理。
 
 ### 1. 募集期限切れチェック (Daily)
 *   **対象:** `status: 'open'` かつ `deadline < now` の案件。
 *   **処理:** ステータスを `closed` (募集終了) に更新し、クライアントへ通知メールを送信。
-*   **返金:** コンペ・タスク方式で仮決済済みの予算がある場合、自動的に `Refund` 処理を実行。
 
 ### 2. 自動検収処理 (Daily)
 *   **対象:** `status: 'submitted'` (納品済み) かつ `submittedAt < 14 days ago` の契約。
@@ -917,31 +735,13 @@ interface Job {
   category: string;            // e.g. "development", "design"
   tags: string[];
   
-  type: 'project' | 'competition' | 'task';
+  type: 'project';             // 固定
   budgetType: 'fixed';         // 固定報酬のみ
   budget: number;              // 予算目安
   deadline: Timestamp;         // 募集期限
   
-  status: 'open' | 'selecting' | 'closed' | 'filled' | 'cancelled';
+  status: 'open' | 'closed' | 'filled' | 'cancelled';
   
-  // Type specific data
-  competition?: {
-    guaranteed: boolean;       // 採用確約
-    additionalPrizes?: number[];
-  };
-  task?: {
-    unitPrice: number;
-    quantity: number;
-    timeLimit: number;         // 分単位
-    questions: {
-      id: string;
-      type: 'text' | 'radio' | 'checkbox';
-      text: string;
-      options?: string[];
-      required: boolean;
-    }[];
-  };
-
   createdAt: Timestamp;
   updatedAt: Timestamp;
   proposalCount: number;       // 非正規化カウンター
@@ -967,7 +767,7 @@ interface Proposal {
   estimatedDuration: string;   // e.g. "1 week"
   attachments: string[];       // ファイルURL
   
-  status: 'pending' | 'interviewing' | 'rejected' | 'hired' | 'adopted';
+  status: 'pending' | 'interviewing' | 'rejected' | 'hired';
   
   // Negotiation History
   negotiationHistory: {
@@ -993,7 +793,6 @@ interface Contract {
   
   // Snapshot
   jobTitle: string;
-  jobType: 'project' | 'competition' | 'task';
   
   // Financials
   amount: number;              // 契約金額 (税抜)
@@ -1028,26 +827,7 @@ interface Contract {
 ```
 
 ### `task_submissions` (Collection)
-タスク方式の作業提出データ。
-```typescript
-interface TaskSubmission {
-  id: string;
-  jobId: string;
-  workerId: string;
-  
-  answers: {
-    questionId: string;
-    value: string | string[];
-  }[];
-  
-  status: 'working' | 'pending' | 'approved' | 'rejected';
-  rejectionReason?: string;
-  
-  startedAt: Timestamp;
-  submittedAt?: Timestamp;
-  reviewedAt?: Timestamp;
-}
-```
+**削除**
 
 ---
 
@@ -1135,7 +915,7 @@ Firestore Security Rulesの概要。
 *   `jobs`: クライアントのみ作成・更新可。読み取りは誰でも可。
 *   `proposals`: 作成はワーカーのみ。読み取りは当該クライアントと作成者のみ。
 *   `contracts`: 当該クライアントとワーカーのみ読み書き可。
-*   `task_submissions`: 作成はワーカーのみ。読み取りは当該クライアントと作成者のみ。
+*   `task_submissions`: **削除**
 
 ---
 
@@ -1152,7 +932,7 @@ Firestore Security Rulesの概要。
 | **販売価格** | 各商品・サービスのご購入ページにて表示する価格 |
 | **商品代金以外の必要料金** | インターネット接続料金、通信料金等はお客様の負担となります。 |
 | **支払方法** | クレジットカード決済 (Stripe)、銀行振込 |
-| **支払時期** | **固定報酬制:** 契約締結時に決済予約（与信確保）を行い、検収完了時に決済確定。<br>**タスク方式:** 募集開始時に決済予約、承認完了時に決済確定。<br>**コンペ方式:** 募集開始時に決済予約、採用決定時に決済確定。 |
+| **支払時期** | 契約締結時に決済予約（与信確保）を行い、検収完了時に決済確定。 |
 | **引渡し時期** | 決済完了後、即時（サービス利用開始） |
 | **返品・交換・キャンセル** | デジタルコンテンツの性質上、原則として返品・返金には応じられません。<br>ただし、当社の責めに帰すべき事由によりサービスが提供されなかった場合はこの限りではありません。<br>契約キャンセル時の返金については利用規約に準じます。 |
 
@@ -1391,3 +1171,5 @@ NEXT_PUBLIC_FIREBASE_APP_ID=1:173689610587:web:ea5e28f0e2e65e6cb43a7e
 | 2025-12-13 | 不具合修正：契約作成APIの認証エラー修正（Authorizationヘッダー追加）、Firestoreセキュリティルールの緩和（チャットルーム作成権限）、ワーカー側契約画面のリアルタイム更新化。 |
 | 2025-12-13 | コンペ方式の不具合修正：①ワーカー仕事詳細ページに「クライアントにメッセージ」ボタン追加、②契約詳細ページのメッセージボタン修正（proposalId || contractIdでルームID決定）、③メッセージページでコンペ方式の契約情報パネル表示対応、④成果物URLの折り返し表示（break-all）追加。 |
 | 2025-12-13 | コンペ方式の追加修正：①ワーカーモードのメッセージ送受信機能修正（proposalIdでルーム作成）、②クライアントモードの納品物受け取り機能確認、③ワーカーが交渉条件を読めるようにproposal情報を取得・表示、④納品URLのoverflow-wrap追加。 |
+| 2025-12-14 | **仕様変更：コンペ方式・タスク方式を廃止し、プロジェクト方式（固定報酬制）に一本化。** |
+| 2025-12-14 | **不具合修正（3件）：** ①メッセージの契約前/契約後の統一（proposalIdをルームIDとして統一）、②クライアント契約詳細ページの納品確認UIを改善（ステータス表示修正）、③仮決済時のStripe決済モーダル表示修正（デモモード条件の修正）。 |
