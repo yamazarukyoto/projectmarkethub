@@ -153,7 +153,7 @@ export default function MessageRoomPage() {
 
     const handleCreateContract = async () => {
         if (!proposal || !job || !user) return;
-        if (!confirm("現在の条件で契約を作成しますか？")) return;
+        if (!confirm("現在の条件で契約オファーを送信しますか？\nワーカーが合意すると契約が成立します。")) return;
 
         try {
             const token = await auth.currentUser?.getIdToken();
@@ -176,7 +176,9 @@ export default function MessageRoomPage() {
             if (data.error) {
                 alert(data.error);
             } else {
-                alert("契約が作成されました。");
+                alert("契約オファーを送信しました。");
+                // 契約詳細ページへ遷移せず、チャットルームに留まるか、契約詳細へ行くか。
+                // 契約詳細ページで「ワーカーの合意待ち」を表示するのが良い。
                 router.push(`/client/contracts/${data.contractId}`);
             }
         } catch (err) {

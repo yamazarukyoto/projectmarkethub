@@ -64,8 +64,20 @@ export default function LoginPage() {
 
             router.push("/client/dashboard"); // Default redirect
         } catch (err: any) {
-            console.error(err);
-            setError("メールアドレスまたはパスワードが正しくありません。");
+            console.error("Login error:", err.code, err.message);
+            if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+                setError("メールアドレスまたはパスワードが正しくありません。");
+            } else if (err.code === 'auth/invalid-email') {
+                setError("無効なメールアドレス形式です。");
+            } else if (err.code === 'auth/too-many-requests') {
+                setError("ログイン試行回数が多すぎます。しばらく待ってから再試行してください。");
+            } else if (err.code === 'auth/network-request-failed') {
+                setError("ネットワークエラーが発生しました。接続を確認してください。");
+            } else if (err.code === 'auth/api-key-not-valid') {
+                setError("Firebase APIキーが無効です。管理者に連絡してください。");
+            } else {
+                setError(`ログインエラー: ${err.code || err.message}`);
+            }
         } finally {
             setIsLoading(false);
         }

@@ -28,6 +28,12 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
                         className
                     )}
                     {...props}
+                    onChange={(e) => {
+                        console.log("Input onChange:", props.name, e.target.value);
+                        if (props.onChange) {
+                            props.onChange(e);
+                        }
+                    }}
                 />
                 {error && <p className="mt-1 text-sm text-danger">{error}</p>}
             </div>

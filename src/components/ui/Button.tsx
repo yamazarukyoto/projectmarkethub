@@ -39,12 +39,6 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
                     sizes[size],
                     className
                 )}
-                onClick={(e) => {
-                    console.log("Button component clicked");
-                    if (props.onClick) {
-                        props.onClick(e);
-                    }
-                }}
                 {...props}
             />
         );

@@ -130,6 +130,7 @@ export interface Contract {
     workerReceiveAmount: number;
     
     status: 
+        | 'pending_signature'
         | 'waiting_for_escrow'
         | 'escrow'
         | 'in_progress'

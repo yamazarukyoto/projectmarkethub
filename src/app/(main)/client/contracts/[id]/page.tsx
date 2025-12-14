@@ -154,13 +154,15 @@ export default function ClientContractDetailPage() {
                             contract.status === 'submitted' ? 'bg-purple-100 text-purple-800' :
                             contract.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
                             contract.status === 'escrow' ? 'bg-cyan-100 text-cyan-800' :
+                            contract.status === 'pending_signature' ? 'bg-orange-100 text-orange-800' :
                             'bg-yellow-100 text-yellow-800'
                         }`}>
                             {contract.status === 'completed' ? '完了' :
                              contract.status === 'submitted' ? '納品確認待ち' :
                              contract.status === 'in_progress' ? '業務進行中' :
                              contract.status === 'escrow' ? '仮決済済み' :
-                             contract.status === 'waiting_for_escrow' ? '仮決済待ち' : contract.status}
+                             contract.status === 'waiting_for_escrow' ? '仮決済待ち' :
+                             contract.status === 'pending_signature' ? '契約合意待ち' : contract.status}
                         </span>
                     </div>
                 </CardHeader>
@@ -202,11 +204,13 @@ export default function ClientContractDetailPage() {
                         <div>
                             <h3 className="text-sm font-semibold text-gray-500 mb-1">ステータス</h3>
                             <div className="flex items-center gap-2">
+                                {contract.status === 'pending_signature' && <FileText size={16} className="text-orange-600" />}
                                 {contract.status === 'escrow' && <Clock size={16} className="text-yellow-600" />}
                                 {contract.status === 'in_progress' && <FileText size={16} className="text-blue-600" />}
                                 {contract.status === 'completed' && <CheckCircle size={16} className="text-green-600" />}
                                 <span>
-                                    {contract.status === 'waiting_for_escrow' ? '仮決済待ち' :
+                                    {contract.status === 'pending_signature' ? '契約合意待ち' :
+                                     contract.status === 'waiting_for_escrow' ? '仮決済待ち' :
                                      contract.status === 'escrow' ? '仮決済済み・業務開始待ち' :
                                      contract.status === 'in_progress' ? '業務進行中' :
                                      contract.status === 'submitted' ? '納品確認待ち' :
@@ -215,6 +219,17 @@ export default function ClientContractDetailPage() {
                             </div>
                         </div>
                     </div>
+
+                    {/* 契約合意待ち */}
+                    {contract.status === 'pending_signature' && (
+                        <div className="bg-orange-50 p-4 rounded-lg border border-orange-100">
+                            <h4 className="font-bold text-orange-900 mb-2">ワーカーの契約合意を待っています</h4>
+                            <p className="text-sm text-orange-800">
+                                契約オファーを送信しました。ワーカーが契約内容を確認し、合意するのをお待ちください。
+                                ワーカーが合意すると、仮決済の手続きに進むことができます。
+                            </p>
+                        </div>
+                    )}
 
                     {/* 仮決済ボタン */}
                     {contract.status === 'waiting_for_escrow' && (
@@ -276,9 +291,27 @@ export default function ClientContractDetailPage() {
                     isOpen={isPaymentModalOpen}
                     onClose={() => setIsPaymentModalOpen(false)}
                     clientSecret={clientSecret}
-                    onSuccess={() => {
+                    onSuccess={async () => {
                         setIsPaymentModalOpen(false);
-                        setContract({ ...contract, status: 'escrow' });
+                        try {
+                            // Stripe決済成功後、verify-payment APIを呼び出してDBを確実に更新
+                            const token = await auth.currentUser?.getIdToken();
+                            const res = await fetch("/api/stripe/verify-payment", {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json",
+                                    Authorization: `Bearer ${token}`,
+                                },
+                                body: JSON.stringify({ contractId: contract.id }),
+                            });
+                            const data = await res.json();
+                            if (data.error) {
+                                console.error("Verify payment error:", data.error);
+                            }
+                        } catch (error) {
+                            console.error("Error verifying payment:", error);
+                        }
+                        // onSnapshotでリアルタイム更新されるため、ローカル状態の更新は不要
                         alert("仮決済が完了しました。");
                     }}
                 />

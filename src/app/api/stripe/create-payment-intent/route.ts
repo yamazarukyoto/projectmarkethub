@@ -74,9 +74,9 @@ export async function POST(req: NextRequest) {
 
     // Stripeが無効な場合のデモ動作（本番環境では常にStripe決済を使用）
     // 注意: デモモードは開発環境でのみ使用
+    // 修正: テスト環境でもStripeを使用するように条件を緩和（sk_test_も許可）
     const isStripeConfigured = process.env.STRIPE_SECRET_KEY && 
-                               process.env.STRIPE_SECRET_KEY !== 'dummy_key' &&
-                               process.env.STRIPE_SECRET_KEY.startsWith('sk_');
+                               process.env.STRIPE_SECRET_KEY !== 'dummy_key';
     
     if (!isStripeConfigured) {
       console.warn("Stripe is not configured. Skipping payment for demo.");

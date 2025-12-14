@@ -170,7 +170,18 @@ export const updateContractStatus = async (contractId: string, status: Contract[
     if (docSnap.exists()) {
         const contract = docSnap.data() as Contract;
         
-        if (status === 'escrow') {
+        if (status === 'waiting_for_escrow') {
+            // ワーカーが契約に合意した時、クライアントへ通知
+            await createNotification({
+                userId: contract.clientId,
+                type: 'contract',
+                title: 'ワーカーが契約に合意しました',
+                body: `${contract.jobTitle}の契約にワーカーが合意しました。仮決済を行ってください。`,
+                link: `/client/contracts/${contractId}`,
+                read: false,
+                createdAt: Timestamp.now()
+            });
+        } else if (status === 'escrow') {
             await createNotification({
                 userId: contract.workerId,
                 type: 'payment',

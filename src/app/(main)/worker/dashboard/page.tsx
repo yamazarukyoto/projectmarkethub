@@ -5,11 +5,11 @@ import Link from "next/link";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Search, Briefcase, FileText, DollarSign, CheckCircle, XCircle, AlertCircle, Trash2 } from "lucide-react";
-import { getJobs, getWorkerProposals, getJob } from "@/lib/db";
+import { Search, Briefcase, FileText, DollarSign, CheckCircle, XCircle, AlertCircle, Trash2, Clock, FileSignature } from "lucide-react";
+import { getJobs, getWorkerProposals, getJob, getContracts } from "@/lib/db";
 import { db } from "@/lib/firebase";
 import { deleteDoc, doc } from "firebase/firestore";
-import { Job, Proposal } from "@/types";
+import { Job, Proposal, Contract } from "@/types";
 
 type Application = Proposal & { job?: Job };
 
@@ -17,6 +17,7 @@ export default function WorkerDashboard() {
     const { user, firebaseUser } = useAuth();
     const [recentJobs, setRecentJobs] = useState<Job[]>([]);
     const [applications, setApplications] = useState<Application[]>([]);
+    const [contracts, setContracts] = useState<Contract[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<'all' | 'pending' | 'hired' | 'rejected'>('all');
 
@@ -37,6 +38,10 @@ export default function WorkerDashboard() {
                         })
                     );
                     setApplications(appsWithJobs);
+
+                    // Fetch contracts for worker
+                    const workerContracts = await getContracts(user.uid, 'worker');
+                    setContracts(workerContracts);
                 } catch (error) {
                     console.error("Error fetching worker dashboard data:", error);
                 }
@@ -116,6 +121,85 @@ export default function WorkerDashboard() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* 契約管理セクション */}
+            {contracts.length > 0 && (
+                <div className="mb-12">
+                    <h2 className="text-xl font-bold text-secondary mb-4 flex items-center gap-2">
+                        <FileSignature size={24} />
+                        契約管理
+                    </h2>
+                    <div className="space-y-4">
+                        {contracts.map((contract) => {
+                            const getStatusBadge = () => {
+                                switch (contract.status) {
+                                    case 'pending_signature':
+                                        return { bg: 'bg-orange-100', text: 'text-orange-800', label: '署名待ち', icon: <Clock size={12} /> };
+                                    case 'waiting_for_escrow':
+                                        return { bg: 'bg-yellow-100', text: 'text-yellow-800', label: '仮払い待ち', icon: <Clock size={12} /> };
+                                    case 'escrow':
+                                        return { bg: 'bg-blue-100', text: 'text-blue-800', label: '仮払い済み', icon: <DollarSign size={12} /> };
+                                    case 'in_progress':
+                                        return { bg: 'bg-purple-100', text: 'text-purple-800', label: '作業中', icon: <Briefcase size={12} /> };
+                                    case 'submitted':
+                                        return { bg: 'bg-indigo-100', text: 'text-indigo-800', label: '納品済み', icon: <FileText size={12} /> };
+                                    case 'completed':
+                                        return { bg: 'bg-green-100', text: 'text-green-800', label: '完了', icon: <CheckCircle size={12} /> };
+                                    default:
+                                        return { bg: 'bg-gray-100', text: 'text-gray-800', label: contract.status, icon: null };
+                                }
+                            };
+                            const badge = getStatusBadge();
+                            
+                            return (
+                                <Card key={contract.id} className={contract.status === 'pending_signature' ? 'border-orange-300 border-2' : ''}>
+                                    <CardContent className="p-6">
+                                        <div className="flex flex-col md:flex-row justify-between gap-4">
+                                            <div className="flex-1">
+                                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                                    <span className={`px-2 py-0.5 rounded text-xs font-medium flex items-center gap-1 whitespace-nowrap ${badge.bg} ${badge.text}`}>
+                                                        {badge.icon}
+                                                        {badge.label}
+                                                    </span>
+                                                    <span className="text-xs text-gray-500 whitespace-nowrap">
+                                                        契約日: {contract.createdAt.toDate().toLocaleDateString()}
+                                                    </span>
+                                                </div>
+
+                                                <h3 className="text-lg font-bold mb-1">
+                                                    <Link href={`/worker/contracts/${contract.id}`} className="hover:underline text-primary">
+                                                        {contract.jobTitle}
+                                                    </Link>
+                                                </h3>
+                                                <p className="text-sm text-gray-600 mb-2">
+                                                    報酬: {contract.amount.toLocaleString()}円
+                                                </p>
+                                                {contract.status === 'pending_signature' && (
+                                                    <p className="text-sm text-orange-600 font-medium">
+                                                        ⚠️ クライアントが契約を作成しました。契約内容を確認して合意してください。
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            <div className="flex items-center gap-2 mt-4 md:mt-0 w-full md:w-auto justify-end">
+                                                <Link href={`/worker/contracts/${contract.id}`}>
+                                                    <Button 
+                                                        variant={contract.status === 'pending_signature' ? 'primary' : 'outline'} 
+                                                        size="sm" 
+                                                        className="whitespace-nowrap"
+                                                    >
+                                                        {contract.status === 'pending_signature' ? '契約を確認する' : '詳細を見る'}
+                                                    </Button>
+                                                </Link>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
                 <h2 className="text-xl font-bold text-secondary">応募管理</h2>

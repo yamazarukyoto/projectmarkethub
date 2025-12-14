@@ -56,7 +56,8 @@ export async function POST(req: Request) {
         // 1. Create Contract in Firestore
         // For Competition, payment is already done at Job creation, so status is 'escrow'
         const isCompetition = type === 'competition';
-        const initialStatus = isCompetition ? 'escrow' : 'waiting_for_escrow';
+        // Change: Initial status is now 'pending_signature' for project type to require worker agreement
+        const initialStatus = isCompetition ? 'escrow' : 'pending_signature';
         const paymentIntentId = isCompetition ? (jobData?.stripePaymentIntentId || "") : "";
         const escrowAt = isCompetition ? admin.firestore.FieldValue.serverTimestamp() : null;
 

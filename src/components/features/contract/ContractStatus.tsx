@@ -8,6 +8,15 @@ interface ContractStatusProps {
 export function ContractStatus({ status }: ContractStatusProps) {
   const getStatusConfig = () => {
     switch (status) {
+      case 'pending_signature':
+        return {
+          label: '契約合意待ち',
+          icon: FileText,
+          color: 'text-orange-600',
+          bg: 'bg-orange-50',
+          border: 'border-orange-200',
+          description: 'ワーカーの契約合意を待っています'
+        };
       case 'waiting_for_escrow':
         return {
           label: '仮払い待ち',

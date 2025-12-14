@@ -78,13 +78,21 @@ export default function WorkerContractDetailPage() {
                 <CardHeader>
                     <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                         <CardTitle className="text-2xl font-bold text-secondary">契約詳細</CardTitle>
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${contract.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                contract.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                                    'bg-yellow-100 text-yellow-800'
-                            }`}>
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+                            contract.status === 'completed' ? 'bg-green-100 text-green-800' :
+                            contract.status === 'submitted' ? 'bg-purple-100 text-purple-800' :
+                            contract.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                            contract.status === 'escrow' ? 'bg-cyan-100 text-cyan-800' :
+                            contract.status === 'waiting_for_escrow' ? 'bg-yellow-100 text-yellow-800' :
+                            contract.status === 'pending_signature' ? 'bg-orange-100 text-orange-800' :
+                            'bg-gray-100 text-gray-800'
+                        }`}>
                             {contract.status === 'completed' ? '完了' :
-                                contract.status === 'in_progress' ? '進行中' :
-                                    contract.status === 'escrow' ? '仮決済済み' : contract.status}
+                             contract.status === 'submitted' ? '検収待ち' :
+                             contract.status === 'in_progress' ? '業務進行中' :
+                             contract.status === 'escrow' ? '仮決済済み' :
+                             contract.status === 'waiting_for_escrow' ? '仮決済待ち' :
+                             contract.status === 'pending_signature' ? '契約合意待ち' : contract.status}
                         </span>
                     </div>
                 </CardHeader>
@@ -124,7 +132,8 @@ export default function WorkerContractDetailPage() {
                                 {contract.status === 'in_progress' && <FileText size={16} className="text-blue-600" />}
                                 {contract.status === 'completed' && <CheckCircle size={16} className="text-green-600" />}
                                 <span>
-                                    {contract.status === 'waiting_for_escrow' ? 'クライアントの仮決済待ちです' :
+                                    {contract.status === 'pending_signature' ? '契約合意待ち' :
+                                     contract.status === 'waiting_for_escrow' ? 'クライアントの仮決済待ちです' :
                                      contract.status === 'escrow' ? '業務を開始してください' :
                                      contract.status === 'in_progress' ? '業務進行中' :
                                      contract.status === 'submitted' ? '検収待ち' :
@@ -134,10 +143,44 @@ export default function WorkerContractDetailPage() {
                         </div>
                     </div>
 
-                    {contract.status === 'escrow' && (
+                    {/* 契約合意待ち - ワーカーが合意するボタン */}
+                    {contract.status === 'pending_signature' && (
+                        <div className="bg-orange-50 p-4 rounded-lg border border-orange-100">
+                            <h4 className="font-bold text-orange-900 mb-2">契約内容を確認してください</h4>
+                            <p className="text-sm text-orange-800 mb-4">
+                                クライアントから契約オファーが届いています。
+                                上記の契約内容（金額、案件名など）を確認し、問題なければ「契約に合意する」ボタンを押してください。
+                                合意後、クライアントが仮決済を行うと業務を開始できます。
+                            </p>
+                            <Button
+                                onClick={async () => {
+                                    if (!confirm("この契約内容で合意しますか？")) return;
+                                    await updateContractStatus(contract.id, 'waiting_for_escrow');
+                                    setContract({ ...contract, status: 'waiting_for_escrow' });
+                                    alert("契約に合意しました。クライアントの仮決済をお待ちください。");
+                                }}
+                                className="bg-accent hover:bg-accent/90 text-white"
+                            >
+                                契約に合意する
+                            </Button>
+                        </div>
+                    )}
+
+                    {/* 仮決済待ち */}
+                    {contract.status === 'waiting_for_escrow' && (
                         <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
-                            <h4 className="font-bold text-yellow-900 mb-2">業務開始</h4>
-                            <p className="text-sm text-yellow-800 mb-4">
+                            <h4 className="font-bold text-yellow-900 mb-2">クライアントの仮決済待ち</h4>
+                            <p className="text-sm text-yellow-800">
+                                契約に合意しました。クライアントが仮決済を完了するまでお待ちください。
+                                仮決済が完了すると、業務を開始できます。
+                            </p>
+                        </div>
+                    )}
+
+                    {contract.status === 'escrow' && (
+                        <div className="bg-cyan-50 p-4 rounded-lg border border-cyan-100">
+                            <h4 className="font-bold text-cyan-900 mb-2">業務開始</h4>
+                            <p className="text-sm text-cyan-800 mb-4">
                                 クライアントの仮決済が完了しました。業務を開始してください。
                             </p>
                             <Button

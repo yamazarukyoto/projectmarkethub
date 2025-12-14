@@ -1,4 +1,4 @@
-# クラウドソーシングプラットフォーム「Project Market Hub」詳細開発仕様書 (Ver 6.0)
+# クラウドソーシングプラットフォーム「Project Market Hub」詳細開発仕様書 (Ver 6.1)
 
 ## 1. プロジェクト定義 & コアコンセプト
 
@@ -116,27 +116,29 @@
     |                                     | (3) 応募/提案 (Apply/Proposal)      |
     |<------------------------------------|-------------------------------------|
     |                                     |                                     |
-    | (4) 契約/採用 (Contract/Adopt)      |                                     |
+    | (4) 契約オファー (Offer)            |                                     |
     |------------------------------------>|------------------------------------>|
+    |                                     | (5) 契約合意 (Accept/Sign)          |
+    |<------------------------------------|-------------------------------------|
     |                                     |                                     |
-    | (5) 仮決済 (Payment Reservation)    |                                     |
+    | (6) 仮決済 (Payment Reservation)    |                                     |
     |     [CREDIT CARD] --(Charge)------> | [STRIPE HOLDING]                    |
     |     (Payment Obligation Fulfilled)  | (Agent Receipt / Custody)           |
     |------------------------------------>|                                     |
     |                                     |------------------------------------>|
     |                                     |      (Notification: Start Work)     |
     |                                     |                                     |
-    |                                     | (6) 業務・納品 (Work & Delivery)    |
+    |                                     | (7) 業務・納品 (Work & Delivery)    |
     |<------------------------------------|-------------------------------------|
     |                                     |                                     |
-    | (7) 検収 (Acceptance)               |                                     |
+    | (8) 検収 (Acceptance)               |                                     |
     |------------------------------------>|                                     |
-    |                                     | (8) 決済確定 (Payment Confirmation) |
+    |                                     | (9) 決済確定 (Payment Confirmation) |
     |                                     | [STRIPE HOLDING] --(Transfer)-----> | [BANK ACCOUNT]
     |                                     | (Release to Worker)                 |
     |                                     |------------------------------------>|
     |                                     |                                     |
-    | (9) 評価 (Review)                   | (9) 評価 (Review)                   |
+    | (10) 評価 (Review)                  | (10) 評価 (Review)                  |
     |------------------------------------>|<------------------------------------|
     v                                     v                                     v
 ```
@@ -152,7 +154,8 @@
 ```mermaid
 stateDiagram-v2
     [*] --> Negotiation: 応募/相談
-    Negotiation --> WaitingForPayment: 契約合意
+    Negotiation --> PendingSignature: 契約オファー(Client)
+    PendingSignature --> WaitingForPayment: 契約合意(Worker)
     WaitingForPayment --> PaymentReserved: 仮決済完了
     PaymentReserved --> InProgress: 業務開始
     InProgress --> Submitted: 納品報告
@@ -161,6 +164,7 @@ stateDiagram-v2
     Completed --> [*]: 評価入力
     
     Negotiation --> Cancelled: 辞退/不成立
+    PendingSignature --> Cancelled: 辞退/取り下げ
     WaitingForPayment --> Cancelled: キャンセル
     PaymentReserved --> Cancelled: キャンセル(決済取消)
     InProgress --> Disputed: トラブル報告
@@ -192,17 +196,21 @@ stateDiagram-v2
         *   `ChatBox`: メッセージ送受信。
         *   `ConditionPanel`: 現在の提示条件（金額・納期）を表示。
         *   `NegotiationActions`:
-            *   **Client:** 「条件変更を提示」「この条件で契約する」ボタン。
-            *   **Worker:** 「条件変更を提示」「同意する」ボタン。
+            *   **Client:** 「条件変更を提示」「この条件で契約オファーを出す」ボタン。
+            *   **Worker:** 「条件変更を提示」「辞退する」ボタン。
 
 **Phase 2: 契約 & 仮決済 (Contract & Payment Reservation)**
-4.  **契約締結 (Client)**
-    *   **Page:** `/messages/[roomId]` または `/client/jobs/[id]` (応募者一覧)
-    *   **UI:** 応募者一覧の各カードに「プロフィールを見る」リンクを設置。クリックで `/users/[workerId]` へ遷移し、詳細を確認できる。
-    *   **Action:** クライアントが最終条件で「契約する」ボタン押下。
-    *   **DB:** `contracts` 作成 (`status: 'waiting_for_escrow'`).
-    *   **Transition:** 画面は自動的に `/client/contracts/[id]` へ遷移する。
-5.  **仮決済 (Client)**
+4.  **契約オファー (Client)**
+    *   **Page:** `/messages/[roomId]`
+    *   **Action:** クライアントが最終条件で「契約オファーを送る」ボタン押下。
+    *   **DB:** `contracts` 作成 (`status: 'pending_signature'`).
+    *   **UI:** チャットルームに「契約オファーが送信されました」と表示。
+5.  **契約合意 (Worker)**
+    *   **Page:** `/messages/[roomId]` または `/worker/contracts/[id]`
+    *   **UI:** 「契約内容を確認して合意する」ボタン。
+    *   **Action:** ワーカーがボタン押下。
+    *   **DB:** `contracts.status` → `'waiting_for_escrow'`.
+6.  **仮決済 (Client)**
     *   **Page:** `/client/contracts/[id]`
     *   **UI:**
         *   `ContractStatus`: 「仮決済待ち」ステータス表示。
@@ -218,7 +226,7 @@ stateDiagram-v2
     *   **DB:** `contracts.status` → `'escrow'`.
 
 **Phase 3: 業務 & 納品 (Work & Delivery)**
-6.  **業務開始 (Worker)**
+7.  **業務開始 (Worker)**
     *   **Page:** `/worker/contracts/[id]`
     *   **UI:**
         *   `ContractStatus`: 「業務中（決済済み）」表示。
@@ -226,12 +234,12 @@ stateDiagram-v2
             *   ファイルアップロード (Drag & Drop)。
             *   コメント入力エリア。
             *   `SubmitButton`: 「納品報告する」（`status === 'escrow'` 時のみ活性化）。
-7.  **納品 (Worker)**
+8.  **納品 (Worker)**
     *   **Action:** 納品報告ボタン押下。
     *   **DB:** `contracts.status` → `'submitted'`.
 
 **Phase 4: 検収 & 決済確定 (Acceptance & Confirmation)**
-8.  **検収 (Client)**
+9.  **検収 (Client)**
     *   **Page:** `/client/contracts/[id]`
     *   **UI:**
         *   `DeliveryPreview`: ワーカーが納品したファイル/URLとコメントを表示。
@@ -242,7 +250,7 @@ stateDiagram-v2
                 *   クリックで確認モーダル表示：「検収を完了しますか？これによりワーカーへの報酬引き渡しが確定します。」
                 *   「確定する」ボタン押下で `/api/contracts/complete` をコール。
     *   **System:** `/api/contracts/complete` (または `/api/stripe/capture-payment-intent`)。
-9.  **評価 (Both)**
+10. **評価 (Both)**
     *   **Page:** `/client/contracts/[id]` / `/worker/contracts/[id]`
     *   **UI:**
         *   `ReviewModal`: 検収完了後に自動ポップアップ、または「評価を入力する」ボタンで表示。
@@ -803,6 +811,7 @@ interface Contract {
   
   // Status
   status: 
+    | 'pending_signature'  // 契約オファー中（ワーカー合意待ち）
     | 'waiting_for_escrow' // 仮決済待ち
     | 'escrow'             // 仮決済済み・作業待ち
     | 'in_progress'        // 作業中（修正対応含む）
@@ -913,7 +922,7 @@ Firestore Security Rulesの概要。
 
 *   `users`: 本人のみ書き込み可。公開プロフィール部分は誰でも読み取り可。
 *   `jobs`: クライアントのみ作成・更新可。読み取りは誰でも可。
-*   `proposals`: 作成はワーカーのみ。読み取りは当該クライアントと作成者のみ。
+*   `proposals`: 作成はワーカーのみ。読み取りは当該クライアントと作成者のみ。**削除は作成者のみ可。**
 *   `contracts`: 当該クライアントとワーカーのみ読み書き可。
 *   `task_submissions`: **削除**
 
@@ -1173,3 +1182,168 @@ NEXT_PUBLIC_FIREBASE_APP_ID=1:173689610587:web:ea5e28f0e2e65e6cb43a7e
 | 2025-12-13 | コンペ方式の追加修正：①ワーカーモードのメッセージ送受信機能修正（proposalIdでルーム作成）、②クライアントモードの納品物受け取り機能確認、③ワーカーが交渉条件を読めるようにproposal情報を取得・表示、④納品URLのoverflow-wrap追加。 |
 | 2025-12-14 | **仕様変更：コンペ方式・タスク方式を廃止し、プロジェクト方式（固定報酬制）に一本化。** |
 | 2025-12-14 | **不具合修正（3件）：** ①メッセージの契約前/契約後の統一（proposalIdをルームIDとして統一）、②クライアント契約詳細ページの納品確認UIを改善（ステータス表示修正）、③仮決済時のStripe決済モーダル表示修正（デモモード条件の修正）。 |
+| 2025-12-14 | **機能改善（3件）：** ①ワーカー応募辞退機能の修正（Firestoreルール更新）、②契約フローの変更（相互合意プロセスの追加）、③Stripe決済フローの修正（PaymentModalの確実な動作）。 |
+| 2025-12-14 | **ログイン機能改善：** ログインエラーメッセージの詳細化（エラーコード別のメッセージ表示）。Firebase Authenticationのエラーハンドリングを改善し、ユーザーに適切なフィードバックを提供。 |
+| 2025-12-14 | **契約フロー改善（2件）：** ①`pending_signature`ステータスの日本語化（「契約合意待ち」として表示）、②ワーカーモードで契約に合意できる機能を追加。クライアントが契約ボタンを押した後、ワーカーも契約ボタンを押す仕組みに変更。 |
+
+---
+
+## 12. 修正計画（2025-12-14 契約フロー改善）
+
+### 12.1 修正内容
+
+#### ①pending_signatureの日本語化
+**対象ファイル:**
+- `src/app/(main)/client/contracts/[id]/page.tsx` - クライアント契約詳細ページ
+- `src/components/features/contract/ContractStatus.tsx` - 契約ステータスコンポーネント
+
+**修正内容:**
+- `pending_signature`ステータスを「契約合意待ち」として日本語表示
+- クライアント側には「ワーカーの契約合意を待っています」と表示
+
+#### ②ワーカーモードで契約に合意できる仕組み
+**対象ファイル:**
+- `src/app/(main)/worker/contracts/[id]/page.tsx` - ワーカー契約詳細ページ
+- `src/lib/db.ts` - データベース操作関数（必要に応じて）
+
+**修正内容:**
+- ワーカー契約詳細ページに`pending_signature`状態で「契約に合意する」ボタンを追加
+- ボタン押下時に`status`を`waiting_for_escrow`に更新
+- 契約内容（金額、案件名など）を確認できるUIを表示
+
+### 12.2 契約フロー（修正後）
+
+```
+1. クライアントが契約オファーを送る
+   → contracts作成 (status: 'pending_signature')
+   
+2. ワーカーが契約詳細ページで「契約に合意する」ボタンを押す
+   → status: 'waiting_for_escrow' に更新
+   
+3. クライアントが仮決済を行う
+   → status: 'escrow' に更新
+   
+4. 以降は既存フロー通り
+```
+
+---
+
+## 13. 修正計画（2025-12-14 契約フロー改善 - 追加修正）
+
+### 13.1 問題点の分析
+
+現在の実装を確認した結果、契約フローのコードは既に正しく実装されています：
+- クライアント: メッセージ画面で「この条件で契約する」→ 契約作成（`pending_signature`）
+- ワーカー: 契約詳細画面で「契約に合意する」→ `waiting_for_escrow`
+- クライアント: 契約詳細画面で「仮決済へ進む」→ Stripe決済 → `escrow`
+
+**発見された問題点:**
+1. ワーカーが契約に合意した時（`waiting_for_escrow`への変更時）、クライアントへの通知が送られていない
+2. ワーカーが契約一覧から`pending_signature`状態の契約を見つけにくい可能性がある
+
+### 13.2 修正内容
+
+#### ①通知機能の追加
+**対象ファイル:**
+- `src/lib/db.ts` - `updateContractStatus`関数
+
+**修正内容:**
+- `waiting_for_escrow`への変更時にクライアントへ通知を送信
+- 「ワーカーが契約に合意しました。仮決済を行ってください。」という通知
+
+#### ②ワーカーダッシュボードの改善（オプション）
+**対象ファイル:**
+- `src/app/(main)/worker/dashboard/page.tsx`
+
+**修正内容:**
+- `pending_signature`状態の契約を「契約合意待ち」として表示
+- 契約詳細ページへのリンクを追加
+
+### 13.3 実装手順
+
+1. `src/lib/db.ts`の`updateContractStatus`関数を修正して、`waiting_for_escrow`への変更時にクライアントへ通知を送信
+2. デプロイして動作確認
+
+---
+
+## 14. 修正計画（2025-12-14 仮決済ステータス更新問題）
+
+### 14.1 問題点の分析
+
+**報告された問題:**
+クライアントが仮決済を完了しているにも関わらず、ワーカー側では「仮決済待ち」のままになっている。
+
+**原因調査結果:**
+
+1. **Stripe Webhookの実装は正しい:**
+   - `src/app/api/webhooks/stripe/route.ts`で`payment_intent.amount_capturable_updated`と`payment_intent.succeeded`イベントを処理
+   - イベント受信時に契約ステータスを`escrow`に更新する処理が実装済み
+
+2. **問題の根本原因:**
+   - `PaymentModal`の`onSuccess`コールバックでは、**ローカル状態のみを更新**しており、Firestoreのデータベースを更新していない
+   - Webhookに依存してステータスを更新しているが、Webhookが失敗した場合のフォールバック処理がない
+   - Webhookが正しく設定されていない、または`STRIPE_WEBHOOK_SECRET`が正しくない可能性
+
+3. **現在のフロー:**
+   ```
+   クライアント: 仮決済ボタン押下
+   → create-payment-intent API: PaymentIntent作成、stripePaymentIntentIdをDBに保存
+   → PaymentModal: Stripe決済実行
+   → 決済成功: onSuccessコールバック（ローカル状態のみ更新）
+   → Webhook: payment_intent.amount_capturable_updated受信 → DBステータス更新（escrow）
+   ```
+   
+   **問題:** Webhookが失敗すると、DBは`waiting_for_escrow`のまま
+
+### 14.2 修正方針
+
+**方針:** Webhookに加えて、クライアント側からも確実にステータスを更新する
+
+1. `PaymentModal`の`onSuccess`コールバックで`verify-payment` APIを呼び出す
+2. `verify-payment` APIでStripeのPaymentIntentステータスを確認し、DBを更新
+3. これにより、Webhookが失敗しても確実にステータスが更新される
+
+### 14.3 修正対象ファイル
+
+1. **`src/app/(main)/client/contracts/[id]/page.tsx`**
+   - `onSuccess`コールバックで`verify-payment` APIを呼び出す
+
+### 14.4 修正内容
+
+```typescript
+// 修正前
+onSuccess={() => {
+    setIsPaymentModalOpen(false);
+    setContract({ ...contract, status: 'escrow' });
+    alert("仮決済が完了しました。");
+}}
+
+// 修正後
+onSuccess={async () => {
+    setIsPaymentModalOpen(false);
+    try {
+        const token = await auth.currentUser?.getIdToken();
+        const res = await fetch("/api/stripe/verify-payment", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ contractId: contract.id }),
+        });
+        const data = await res.json();
+        if (data.error) {
+            console.error("Verify payment error:", data.error);
+        }
+    } catch (error) {
+        console.error("Error verifying payment:", error);
+    }
+    // onSnapshotでリアルタイム更新されるため、ローカル状態の更新は不要
+    alert("仮決済が完了しました。");
+}}
+```
+
+### 14.5 実装手順
+
+1. `src/app/(main)/client/contracts/[id]/page.tsx`を修正
+2. デプロイして動作確認
