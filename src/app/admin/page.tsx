@@ -2,8 +2,30 @@
 
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
+import { useAuth } from "@/components/providers/AuthProvider";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+
+const ADMIN_EMAIL = "yamazarukyoto@gmail.com";
 
 export default function AdminDashboard() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && (!user || user.email !== ADMIN_EMAIL)) {
+      router.replace(user ? "/" : "/login?redirect=/admin");
+    }
+  }, [user, loading, router]);
+
+  if (loading || !user || user.email !== ADMIN_EMAIL) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto py-8">
       <h1 className="text-2xl font-bold mb-6">管理画面</h1>

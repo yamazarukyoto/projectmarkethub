@@ -9,8 +9,12 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { ArrowLeft, AlertTriangle, RefreshCw, Ban, MessageSquare, FileText } from "lucide-react";
 import Link from "next/link";
+import { useAuth } from "@/components/providers/AuthProvider";
+
+const ADMIN_EMAIL = "yamazarukyoto@gmail.com";
 
 export default function AdminContractDetailPage() {
+    const { user: authUser, loading: authLoading } = useAuth();
     const params = useParams();
     const router = useRouter();
     const [contract, setContract] = useState<Contract | null>(null);
@@ -21,7 +25,13 @@ export default function AdminContractDetailPage() {
     const [workerName, setWorkerName] = useState("");
 
     useEffect(() => {
-        if (!params.id) return;
+        if (!authLoading && (!authUser || authUser.email !== ADMIN_EMAIL)) {
+            router.replace(authUser ? "/" : "/login?redirect=/admin/contracts");
+        }
+    }, [authUser, authLoading, router]);
+
+    useEffect(() => {
+        if (!params.id || authLoading || !authUser || authUser.email !== ADMIN_EMAIL) return;
 
         const unsubscribe = onSnapshot(doc(db, "contracts", params.id as string), async (docSnap) => {
             if (docSnap.exists()) {
@@ -46,7 +56,15 @@ export default function AdminContractDetailPage() {
         });
 
         return () => unsubscribe();
-    }, [params.id]);
+    }, [params.id, authLoading, authUser]);
+
+    if (authLoading || !authUser || authUser.email !== ADMIN_EMAIL) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+        );
+    }
 
     const handleForceCancel = async (withRefund: boolean) => {
         if (!contract) return;

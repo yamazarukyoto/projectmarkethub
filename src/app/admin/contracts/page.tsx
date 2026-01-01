@@ -5,12 +5,26 @@ import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Contract } from "@/types";
 import Link from "next/link";
+import { useAuth } from "@/components/providers/AuthProvider";
+import { useRouter } from "next/navigation";
+
+const ADMIN_EMAIL = "yamazarukyoto@gmail.com";
 
 export default function AdminContractsPage() {
+  const { user: authUser, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!authLoading && (!authUser || authUser.email !== ADMIN_EMAIL)) {
+      router.replace(authUser ? "/" : "/login?redirect=/admin/contracts");
+    }
+  }, [authUser, authLoading, router]);
+
+  useEffect(() => {
+    if (authLoading || !authUser || authUser.email !== ADMIN_EMAIL) return;
+    
     const fetchContracts = async () => {
       try {
         const q = query(collection(db, "contracts"), orderBy("createdAt", "desc"), limit(50));
@@ -25,7 +39,15 @@ export default function AdminContractsPage() {
     };
 
     fetchContracts();
-  }, []);
+  }, [authLoading, authUser]);
+
+  if (authLoading || !authUser || authUser.email !== ADMIN_EMAIL) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   if (loading) return <div className="p-8">Loading...</div>;
 

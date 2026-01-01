@@ -5,12 +5,26 @@ import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { User } from "@/types";
 import { Card } from "@/components/ui/Card";
+import { useAuth } from "@/components/providers/AuthProvider";
+import { useRouter } from "next/navigation";
+
+const ADMIN_EMAIL = "yamazarukyoto@gmail.com";
 
 export default function AdminUsersPage() {
+  const { user: authUser, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!authLoading && (!authUser || authUser.email !== ADMIN_EMAIL)) {
+      router.replace(authUser ? "/" : "/login?redirect=/admin/users");
+    }
+  }, [authUser, authLoading, router]);
+
+  useEffect(() => {
+    if (authLoading || !authUser || authUser.email !== ADMIN_EMAIL) return;
+    
     const fetchUsers = async () => {
       try {
         const q = query(collection(db, "users"), orderBy("createdAt", "desc"), limit(50));
@@ -25,7 +39,15 @@ export default function AdminUsersPage() {
     };
 
     fetchUsers();
-  }, []);
+  }, [authLoading, authUser]);
+
+  if (authLoading || !authUser || authUser.email !== ADMIN_EMAIL) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   if (loading) return <div className="p-8">Loading...</div>;
 
