@@ -67,11 +67,16 @@ export default function AdminDashboard() {
       const token = await auth.currentUser?.getIdToken();
       if (!token) {
         alert("認証エラー: ログインし直してください。");
+        setIsProcessing(false);
         return;
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
-      const res = await fetch(`${apiUrl}/api/admin/force-cancel`, {
+      // タイムアウト設定（60秒）
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+      // 同じドメインのAPIを使用（CORSを回避）
+      const res = await fetch(`/api/admin/force-cancel`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -82,7 +87,10 @@ export default function AdminDashboard() {
           reason: cancelReason || "運営による強制キャンセル",
           refund: withRefund,
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       const data = await res.json();
       if (data.error) {
