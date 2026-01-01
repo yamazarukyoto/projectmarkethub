@@ -9,6 +9,10 @@ service cloud.firestore {
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
+    
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == "yamazarukyoto@gmail.com";
+    }
 
     // Users collection
     match /users/{userId} {
@@ -41,8 +45,8 @@ service cloud.firestore {
     // Contracts collection
     match /contracts/{contractId} {
       allow create: if isAuthenticated(); // Usually created via API, but if client-side creation is used
-      allow read: if isAuthenticated() && (resource.data.workerId == request.auth.uid || resource.data.clientId == request.auth.uid);
-      allow update: if isAuthenticated() && (resource.data.workerId == request.auth.uid || resource.data.clientId == request.auth.uid);
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.workerId == request.auth.uid || resource.data.clientId == request.auth.uid);
+      allow update: if isAuthenticated() && (isAdmin() || resource.data.workerId == request.auth.uid || resource.data.clientId == request.auth.uid);
     }
 
     // Notifications collection

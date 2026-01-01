@@ -237,9 +237,9 @@ export default function MessageRoomPage() {
         setIsCreatingContract(true);
         setErrorMessage(null);
 
-        // タイムアウト設定 (15秒)
+        // タイムアウト設定 (60秒 - Cloud Runのコールドスタート対応)
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
 
         try {
             console.log("Starting contract creation...", {
