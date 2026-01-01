@@ -34,6 +34,7 @@ export async function GET(req: Request) {
 
         // Stripeが無効な場合
         if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'dummy_key') {
+            console.error("Stripe Secret Key is missing or invalid.");
             return NextResponse.json({ 
                 url: null,
                 isDemo: true,
@@ -42,9 +43,41 @@ export async function GET(req: Request) {
         }
 
         // 3. ログインリンクを生成
-        const loginLink = await stripe.accounts.createLoginLink(stripeAccountId);
+        try {
+            const loginLink = await stripe.accounts.createLoginLink(stripeAccountId);
+            return NextResponse.json({ url: loginLink.url });
+        } catch (stripeError: any) {
+            console.error("Stripe API Error (createLoginLink):", stripeError);
+            
+            // Onboarding未完了、または要件不足の場合のハンドリング
+            // account_invalid: アカウントが無効
+            // requirements.past_due: 要件期限切れ（ログインリンク作成に失敗する場合がある）
+            // その他、ログインリンク作成に失敗した場合は、基本的にOnboardingへ誘導するのが安全
+            
+            console.log("Falling back to Account Link (Onboarding) due to login link failure.");
 
-        return NextResponse.json({ url: loginLink.url });
+            try {
+                // 新しいAccount Linkを作成して返す
+                const accountLink = await stripe.accountLinks.create({
+                    account: stripeAccountId,
+                    refresh_url: `${process.env.NEXT_PUBLIC_BASE_URL}/account/worker/payout`,
+                    return_url: `${process.env.NEXT_PUBLIC_BASE_URL}/account/worker/payout?success=true`,
+                    type: "account_onboarding",
+                });
+                return NextResponse.json({ 
+                    url: accountLink.url,
+                    isOnboarding: true,
+                    message: "Stripeアカウントの設定を確認する必要があります。設定画面へ移動します。"
+                });
+            } catch (linkError: any) {
+                console.error("Failed to create Account Link:", linkError);
+                return NextResponse.json({ 
+                    error: stripeError.message || "Stripe API Error",
+                    code: stripeError.code,
+                    type: stripeError.type
+                }, { status: 500 });
+            }
+        }
     } catch (error: any) {
         console.error("Stripe Login Link Error:", error);
         return NextResponse.json({ 

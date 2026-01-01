@@ -189,7 +189,23 @@ export default function TermsPage() {
                 </section>
 
                 <section>
-                    <h2 className="text-xl font-bold mb-4 text-secondary border-b pb-2">第13条（保証の否認および免責事項）</h2>
+                    <h2 className="text-xl font-bold mb-4 text-secondary border-b pb-2">第13条（データの保管期間）</h2>
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                        <p className="font-medium text-yellow-800">
+                            ⚠️ 重要：完了した契約データは自動削除されます
+                        </p>
+                    </div>
+                    <ol className="list-decimal list-inside space-y-2 ml-2">
+                        <li><strong>契約データの保管期間：</strong>完了（検収完了）またはキャンセルされた契約に関するデータは、完了日またはキャンセル日から<strong>3か月間</strong>保管されます。</li>
+                        <li><strong>自動削除：</strong>保管期間経過後、契約データ（契約情報、納品物、メッセージ履歴等）は自動的に削除されます。削除されたデータの復元はできません。</li>
+                        <li><strong>削除前通知：</strong>削除予定日の約2週間前および1週間前に、登録メールアドレス宛に通知を送信します。</li>
+                        <li><strong>ユーザーの責任：</strong>ユーザーは、保管期間内に必要なデータ（納品物、契約内容、メッセージ等）を自己の責任においてダウンロード・保存するものとします。</li>
+                        <li><strong>免責：</strong>運営者は、保管期間経過後のデータ削除について一切の責任を負いません。データの保存忘れによる損害についても、運営者は責任を負いません。</li>
+                    </ol>
+                </section>
+
+                <section>
+                    <h2 className="text-xl font-bold mb-4 text-secondary border-b pb-2">第14条（保証の否認および免責事項）</h2>
                     <ol className="list-decimal list-inside space-y-2 ml-2">
                         <li>本サービスは、現状有姿（As-Is）で提供されるものであり、運営者はその完全性、正確性、有用性、特定目的への適合性等について、いかなる保証も行いません。</li>
                         <li>運営者は、本サービスに事実上または法律上の瑕疵（安全性、信頼性、正確性、完全性、有効性、特定の目的への適合性、セキュリティなどに関する欠陥、エラーやバグ、権利侵害などを含みます。）がないことを明示的にも黙示的にも保証しておりません。</li>
@@ -202,7 +218,7 @@ export default function TermsPage() {
                 </section>
 
                 <section>
-                    <h2 className="text-xl font-bold mb-4 text-secondary border-b pb-2">第14条（サポートおよび問い合わせ）</h2>
+                    <h2 className="text-xl font-bold mb-4 text-secondary border-b pb-2">第15条（サポートおよび問い合わせ）</h2>
                     <ol className="list-decimal list-inside space-y-2 ml-2">
                         <li>本サービスは個人運営のため、サポート対応には限界があります。</li>
                         <li>問い合わせへの回答には、数日から数週間を要する場合があります。</li>
@@ -220,12 +236,12 @@ export default function TermsPage() {
                 </section>
 
                 <section>
-                    <h2 className="text-xl font-bold mb-4 text-secondary border-b pb-2">第15条（サービス内容の変更等）</h2>
+                    <h2 className="text-xl font-bold mb-4 text-secondary border-b pb-2">第16条（サービス内容の変更等）</h2>
                     <p>運営者は、ユーザーへの事前の告知なく、本サービスの内容を変更、追加または廃止することがあり、ユーザーはこれを承諾するものとします。</p>
                 </section>
 
                 <section>
-                    <h2 className="text-xl font-bold mb-4 text-secondary border-b pb-2">第16条（利用規約の変更）</h2>
+                    <h2 className="text-xl font-bold mb-4 text-secondary border-b pb-2">第17条（利用規約の変更）</h2>
                     <ol className="list-decimal list-inside space-y-2 ml-2">
                         <li>運営者は以下の場合には、ユーザーの個別の同意を要せず、本規約を変更することができるものとします。
                             <ul className="list-disc list-inside ml-6 mt-2 space-y-1 text-gray-600">
@@ -238,12 +254,12 @@ export default function TermsPage() {
                 </section>
 
                 <section>
-                    <h2 className="text-xl font-bold mb-4 text-secondary border-b pb-2">第17条（個人情報の取扱い）</h2>
+                    <h2 className="text-xl font-bold mb-4 text-secondary border-b pb-2">第18条（個人情報の取扱い）</h2>
                     <p>運営者は、本サービスの利用によって取得する個人情報については、別途定める「プライバシーポリシー」に従い適切に取り扱うものとします。</p>
                 </section>
 
                 <section>
-                    <h2 className="text-xl font-bold mb-4 text-secondary border-b pb-2">第18条（通知または連絡）</h2>
+                    <h2 className="text-xl font-bold mb-4 text-secondary border-b pb-2">第19条（通知または連絡）</h2>
                     <ol className="list-decimal list-inside space-y-2 ml-2">
                         <li>ユーザーと運営者との間の通知または連絡は、運営者の定める方法によって行うものとします。</li>
                         <li>運営者は、ユーザーから、運営者が別途定める方式に従った変更届け出がない限り、現在登録されている連絡先が有効なものとみなして当該連絡先へ通知または連絡を行い、これらは、発信時にユーザーへ到達したものとみなします。</li>
@@ -252,17 +268,17 @@ export default function TermsPage() {
                 </section>
 
                 <section>
-                    <h2 className="text-xl font-bold mb-4 text-secondary border-b pb-2">第19条（権利義務の譲渡の禁止）</h2>
+                    <h2 className="text-xl font-bold mb-4 text-secondary border-b pb-2">第20条（権利義務の譲渡の禁止）</h2>
                     <p>ユーザーは、運営者の書面による事前の承諾なく、利用契約上の地位または本規約に基づく権利もしくは義務を第三者に譲渡し、または担保に供することはできません。</p>
                 </section>
 
                 <section>
-                    <h2 className="text-xl font-bold mb-4 text-secondary border-b pb-2">第20条（分離可能性）</h2>
+                    <h2 className="text-xl font-bold mb-4 text-secondary border-b pb-2">第21条（分離可能性）</h2>
                     <p>本規約のいずれかの条項またはその一部が、消費者契約法その他の法令等により無効または執行不能と判断された場合であっても、本規約の残りの規定および一部が無効または執行不能と判断された規定の残りの部分は、継続して完全に効力を有するものとします。</p>
                 </section>
 
                 <section>
-                    <h2 className="text-xl font-bold mb-4 text-secondary border-b pb-2">第21条（準拠法・裁判管轄）</h2>
+                    <h2 className="text-xl font-bold mb-4 text-secondary border-b pb-2">第22条（準拠法・裁判管轄）</h2>
                     <ol className="list-decimal list-inside space-y-2 ml-2">
                         <li>本規約の解釈にあたっては、日本法を準拠法とします。</li>
                         <li>本サービスに関して紛争が生じた場合には、京都地方裁判所を第一審の専属的合意管轄裁判所とします。</li>

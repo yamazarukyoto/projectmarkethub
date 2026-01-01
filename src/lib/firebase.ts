@@ -5,13 +5,19 @@ import { getStorage } from "firebase/storage";
 import { getFunctions } from "firebase/functions";
 
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "dummy",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "dummy.firebaseapp.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "dummy-project",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "dummy.appspot.com",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "1234567890",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:1234567890:web:dummy",
+  apiKey: "AIzaSyD6uAWaLZ6hHgYZpvRrcCKGOZRGWi3ruNU",
+  authDomain: "projectmarkethub-db904.firebaseapp.com",
+  projectId: "projectmarkethub-db904",
+  storageBucket: "projectmarkethub-db904.firebasestorage.app",
+  messagingSenderId: "173689610587",
+  appId: "1:173689610587:web:ea5e28f0e2e65e6cb43a7e",
 };
+
+console.log("Firebase Config:", {
+  apiKey: firebaseConfig.apiKey ? "Set" : "Not Set",
+  authDomain: firebaseConfig.authDomain,
+  projectId: firebaseConfig.projectId,
+});
 
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();

@@ -288,3 +288,45 @@ AIが操作するディレクトリには最低限以下が存在すること。
 - src/lib/firebase.ts: GoogleAuthProviderの初期化を追加
 - src/app/(auth)/register/page.tsx: Google登録ボタンと処理を追加
 - src/app/(auth)/login/page.tsx: Googleログインボタンと処理を追加
+
+================================================================================ 8. ⚠️ Cloud Run URL に関する重要な注意点
+
+**問題の背景:**
+Cloud Runサービスを再作成したり、特定の操作を行うと、Cloud RunのサービスURLが変更されることがあります。
+このURLは `NEXT_PUBLIC_API_URL` 環境変数として使用されており、フロントエンドからAPIを呼び出す際に使用されます。
+
+**現在のCloud Run URL:**
+```
+https://projectmarkethub-5ckpwmqfza-an.a.run.app
+```
+
+**注意:** Cloud Runには2つのURL形式があります：
+- 旧形式: `https://projectmarkethub-5ckpwmqfza-an.a.run.app`
+- 新形式: `https://projectmarkethub-173689610587.asia-northeast1.run.app`
+
+どちらも同じサービスを指しますが、`cloudbuild.yaml`では旧形式を使用しています。
+
+**URLが変更された場合の症状:**
+- APIコールがタイムアウトする
+- ボタンを押しても「送信中...」のまま固まる
+- ネットワークエラーが発生する
+
+**デプロイ前の確認手順:**
+
+1. 現在のCloud Run URLを確認:
+```bash
+gcloud run services describe projectmarkethub --region=asia-northeast1 --format="value(status.url)" --project=projectmarkethub-db904
+```
+
+2. `cloudbuild.yaml` の `_NEXT_PUBLIC_API_URL` が上記URLと一致しているか確認
+
+3. 一致していない場合は `cloudbuild.yaml` を更新してから再ビルド・デプロイ
+
+**cloudbuild.yaml の該当箇所:**
+```yaml
+substitutions:
+  ...
+  _NEXT_PUBLIC_API_URL: 'https://projectmarkethub-5ckpwmqfza-an.a.run.app'
+```
+
+**注意:** URLが変更された場合、必ず再ビルドが必要です。Cloud Runへのデプロイだけでは反映されません。

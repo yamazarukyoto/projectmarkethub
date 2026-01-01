@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense, useCallback } from "react";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { CreditCard, CheckCircle, ExternalLink, History, Wallet, AlertCircle } from "lucide-react";
+import { CreditCard, CheckCircle, ExternalLink, History, Wallet, AlertCircle, Download } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -26,6 +26,30 @@ function PaymentSettingsContent() {
     const [completedContracts, setCompletedContracts] = useState<CompletedContract[]>([]);
     const [contractsLoading, setContractsLoading] = useState(true);
     const [totalEarnings, setTotalEarnings] = useState(0);
+    const [stripeStatus, setStripeStatus] = useState<any>(null);
+    const [statusLoading, setStatusLoading] = useState(true);
+
+    // Stripeアカウントの状態を取得
+    const fetchStripeStatus = useCallback(async () => {
+        if (!user || !firebaseUser) return;
+        setStatusLoading(true);
+        try {
+            const token = await firebaseUser.getIdToken();
+            const res = await fetch("/api/stripe/account-status", {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const data = await res.json();
+            setStripeStatus(data);
+        } catch (error) {
+            console.error("Error fetching stripe status:", error);
+        } finally {
+            setStatusLoading(false);
+        }
+    }, [user, firebaseUser]);
+
+    useEffect(() => {
+        fetchStripeStatus();
+    }, [fetchStripeStatus]);
 
     // 完了した契約（報酬履歴）を取得
     const fetchCompletedContracts = useCallback(async () => {
@@ -47,17 +71,23 @@ function PaymentSettingsContent() {
             
             snapshot.forEach((doc) => {
                 const data = doc.data();
+                // workerReceiveAmountが存在しない場合は0として扱う
+                // amountから手数料を引いた額を計算するフォールバックも検討可能だが、
+                // 基本的にはDBに保存されているはず
+                const amount = data.workerReceiveAmount || 0;
+                
                 const contract: CompletedContract = {
                     id: doc.id,
                     jobTitle: data.jobTitle || "案件名なし",
-                    workerReceiveAmount: data.workerReceiveAmount || 0,
+                    workerReceiveAmount: amount,
                     completedAt: data.completedAt?.toDate() || null,
                     stripeTransferId: data.stripeTransferId,
                 };
                 contracts.push(contract);
-                total += contract.workerReceiveAmount;
+                total += amount;
             });
             
+            console.log("Fetched contracts:", contracts); // Debug log
             setCompletedContracts(contracts);
             setTotalEarnings(total);
         } catch (error) {
@@ -114,14 +144,26 @@ function PaymentSettingsContent() {
             
             if (data.isDemo) {
                 alert(data.message || "デモモードのため、Stripeダッシュボードは利用できません。");
+            } else if (data.isOnboarding) {
+                // Onboarding未完了（または要件不足）の場合
+                // ユーザーに確認を求めず、メッセージを表示して直接遷移させる（「開かない」を防ぐため）
+                alert(data.message || "Stripeアカウントの設定が必要です。設定画面へ移動します。");
+                window.location.href = data.url;
             } else if (data.url) {
-                window.open(data.url, "_blank");
+                // ログインリンクの場合
+                // ポップアップブロック対策: まず新しいタブで開き、失敗したら現在のタブで開く
+                const newWindow = window.open(data.url, "_blank");
+                if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
+                    // ポップアップがブロックされた場合、確認なしで現在のタブで開く
+                    window.location.href = data.url;
+                }
             } else if (data.error) {
-                alert(`エラーが発生しました: ${data.error}`);
+                console.error("Stripe Dashboard Error:", data);
+                alert(`Stripeダッシュボードを開けませんでした。\nエラー: ${data.error}\nコード: ${data.code || 'unknown'}`);
             }
         } catch (error) {
             console.error(error);
-            alert("通信エラーが発生しました。");
+            alert("通信エラーが発生しました。もう一度お試しください。");
         } finally {
             setDashboardLoading(false);
         }
@@ -143,42 +185,109 @@ function PaymentSettingsContent() {
         }).format(amount);
     };
 
-    const isConnected = user?.stripeAccountId || success;
+    // CSV出力機能
+    const handleExportCSV = () => {
+        if (completedContracts.length === 0) {
+            alert("出力するデータがありません。");
+            return;
+        }
+
+        // CSVヘッダー
+        const headers = ["案件名", "報酬額", "完了日", "ステータス"];
+        
+        // CSVデータ行
+        const rows = completedContracts.map((contract) => {
+            const status = contract.stripeTransferId ? "送金済み" : "処理中";
+            const completedDate = contract.completedAt 
+                ? contract.completedAt.toLocaleDateString("ja-JP", {
+                    year: "numeric",
+                    month: "2-digit",
+                    day: "2-digit",
+                })
+                : "-";
+            return [
+                `"${contract.jobTitle.replace(/"/g, '""')}"`, // ダブルクォートをエスケープ
+                contract.workerReceiveAmount.toString(),
+                completedDate,
+                status,
+            ];
+        });
+
+        // CSV文字列を生成
+        const csvContent = [
+            headers.join(","),
+            ...rows.map((row) => row.join(",")),
+        ].join("\n");
+
+        // BOM付きUTF-8でエンコード（Excelで文字化けしないように）
+        const bom = new Uint8Array([0xef, 0xbb, 0xbf]);
+        const blob = new Blob([bom, csvContent], { type: "text/csv;charset=utf-8;" });
+
+        // ダウンロード
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        const now = new Date();
+        const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+        link.download = `報酬履歴_${dateStr}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
+    const isConnected = stripeStatus?.connected;
+    const isRestricted = stripeStatus?.status === 'restricted' || stripeStatus?.status === 'incomplete';
 
     return (
         <div className="container mx-auto px-4 py-8 space-y-6">
-            <h1 className="text-2xl font-bold text-secondary mb-6">報酬受取設定</h1>
+            <h1 className="text-2xl font-bold text-secondary mb-6">報酬・本人確認</h1>
 
             {/* Stripe連携カード */}
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                        <CreditCard /> Stripe連携
+                        <CreditCard /> Stripe連携（本人確認）
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
                     <p className="text-gray-600 mb-6">
-                        報酬を受け取るためには、Stripeアカウントとの連携が必要です。
-                        以下のボタンから連携手続きを行ってください。
+                        報酬の受け取りおよび本人確認のために、Stripeアカウントとの連携が必要です。
+                        以下のボタンから連携手続きを行ってください。<br />
+                        <span className="text-sm text-gray-500">※ Stripeでの本人確認（KYC）完了をもって、本プラットフォームの本人確認完了とみなします。</span>
                     </p>
 
-                    {isConnected ? (
+                    {statusLoading ? (
+                        <div className="text-center py-4">読み込み中...</div>
+                    ) : isConnected ? (
                         <div className="space-y-4">
-                            <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
-                                <CheckCircle className="text-green-600" size={24} />
-                                <div>
-                                    <p className="font-bold text-green-800">連携済み</p>
-                                    <p className="text-sm text-green-700">報酬の受け取りが可能です。</p>
+                            {isRestricted ? (
+                                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center gap-3">
+                                    <AlertCircle className="text-yellow-600" size={24} />
+                                    <div>
+                                        <p className="font-bold text-yellow-800">追加情報が必要です</p>
+                                        <p className="text-sm text-yellow-700">
+                                            報酬を受け取るには、Stripeダッシュボードで本人確認情報や銀行口座情報を完了させる必要があります。
+                                        </p>
+                                    </div>
                                 </div>
-                            </div>
+                            ) : (
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
+                                    <CheckCircle className="text-green-600" size={24} />
+                                    <div>
+                                        <p className="font-bold text-green-800">連携済み（本人確認完了）</p>
+                                        <p className="text-sm text-green-700">報酬の受け取りが可能です。</p>
+                                    </div>
+                                </div>
+                            )}
                             
                             <Button 
                                 onClick={handleOpenDashboard} 
                                 disabled={dashboardLoading}
-                                variant="outline"
+                                variant={isRestricted ? "primary" : "outline"}
                                 className="w-full md:w-auto"
                             >
-                                {dashboardLoading ? "読み込み中..." : "Stripeダッシュボードを開く"} 
+                                {dashboardLoading ? "読み込み中..." : isRestricted ? "設定を完了する" : "Stripeダッシュボードを開く"} 
                                 <ExternalLink size={16} className="ml-2" />
                             </Button>
                             <p className="text-sm text-gray-500">
@@ -221,9 +330,22 @@ function PaymentSettingsContent() {
             {/* 報酬履歴カード */}
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <History /> 報酬履歴
-                    </CardTitle>
+                    <div className="flex items-center justify-between">
+                        <CardTitle className="flex items-center gap-2">
+                            <History /> 報酬履歴
+                        </CardTitle>
+                        {completedContracts.length > 0 && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleExportCSV}
+                                className="flex items-center gap-2"
+                            >
+                                <Download size={16} />
+                                CSV出力
+                            </Button>
+                        )}
+                    </div>
                 </CardHeader>
                 <CardContent>
                     {contractsLoading ? (
@@ -237,45 +359,53 @@ function PaymentSettingsContent() {
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead>
-                                    <tr className="border-b">
-                                        <th className="text-left py-3 px-2 text-sm font-medium text-gray-600">案件名</th>
-                                        <th className="text-right py-3 px-2 text-sm font-medium text-gray-600">報酬額</th>
-                                        <th className="text-right py-3 px-2 text-sm font-medium text-gray-600">完了日</th>
-                                        <th className="text-center py-3 px-2 text-sm font-medium text-gray-600">ステータス</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {completedContracts.map((contract) => (
-                                        <tr key={contract.id} className="border-b hover:bg-gray-50">
-                                            <td className="py-3 px-2">
-                                                <span className="font-medium">{contract.jobTitle}</span>
-                                            </td>
-                                            <td className="py-3 px-2 text-right">
-                                                <span className="font-bold text-primary">
-                                                    {formatCurrency(contract.workerReceiveAmount)}
-                                                </span>
-                                            </td>
-                                            <td className="py-3 px-2 text-right text-sm text-gray-600">
-                                                {formatDate(contract.completedAt)}
-                                            </td>
-                                            <td className="py-3 px-2 text-center">
-                                                {contract.stripeTransferId ? (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                                                        <CheckCircle size={12} />
-                                                        送金済み
-                                                    </span>
-                                                ) : (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
-                                                        処理中
-                                                    </span>
-                                                )}
-                                            </td>
+                            {/* スクロール可能なテーブルコンテナ（最大10件分の高さ） */}
+                            <div className="max-h-[480px] overflow-y-auto border rounded-lg">
+                                <table className="w-full">
+                                    <thead className="sticky top-0 bg-white border-b">
+                                        <tr>
+                                            <th className="text-left py-3 px-2 text-sm font-medium text-gray-600">案件名</th>
+                                            <th className="text-right py-3 px-2 text-sm font-medium text-gray-600">報酬額</th>
+                                            <th className="text-right py-3 px-2 text-sm font-medium text-gray-600">完了日</th>
+                                            <th className="text-center py-3 px-2 text-sm font-medium text-gray-600">ステータス</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {completedContracts.map((contract) => (
+                                            <tr key={contract.id} className="border-b hover:bg-gray-50">
+                                                <td className="py-3 px-2">
+                                                    <span className="font-medium">{contract.jobTitle}</span>
+                                                </td>
+                                                <td className="py-3 px-2 text-right">
+                                                    <span className="font-bold text-primary">
+                                                        {formatCurrency(contract.workerReceiveAmount)}
+                                                    </span>
+                                                </td>
+                                                <td className="py-3 px-2 text-right text-sm text-gray-600">
+                                                    {formatDate(contract.completedAt)}
+                                                </td>
+                                                <td className="py-3 px-2 text-center">
+                                                    {contract.stripeTransferId ? (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                                                            <CheckCircle size={12} />
+                                                            送金済み
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
+                                                            処理中
+                                                        </span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {completedContracts.length > 10 && (
+                                <p className="text-sm text-gray-500 mt-2 text-center">
+                                    {completedContracts.length}件中、スクロールで全件表示できます
+                                </p>
+                            )}
                         </div>
                     )}
                 </CardContent>

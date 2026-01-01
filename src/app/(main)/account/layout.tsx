@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
-import { User, Shield, Bell, Briefcase, CreditCard, Lock, UserX, UserCircle, Wallet } from "lucide-react";
+import { User, Shield, Briefcase, CreditCard, Lock, UserX, UserCircle, Wallet, ExternalLink } from "lucide-react";
+import { useAuth } from "@/components/providers/AuthProvider";
 
 export default function AccountLayout({
     children,
@@ -11,15 +12,14 @@ export default function AccountLayout({
     children: React.ReactNode;
 }) {
     const pathname = usePathname();
+    const { user } = useAuth();
 
     const menuGroups = [
         {
             title: "共通設定",
             items: [
                 { href: "/account/profile", label: "基本情報編集", icon: User },
-                { href: "/account/verification", label: "本人確認", icon: Shield },
-                { href: "/account/notifications", label: "通知設定", icon: Bell },
-                { href: "/account/security", label: "メールアドレス・パスワード", icon: Lock },
+                { href: "/account/security", label: "パスワード変更", icon: Lock },
                 { href: "/account/withdraw", label: "退会申請", icon: UserX },
             ],
         },
@@ -27,14 +27,13 @@ export default function AccountLayout({
             title: "クライアント設定",
             items: [
                 { href: "/account/client/profile", label: "クライアントプロフィール", icon: UserCircle },
-                { href: "/account/client/payment", label: "支払い方法", icon: Wallet },
             ],
         },
         {
             title: "ワーカー設定",
             items: [
                 { href: "/account/worker/profile", label: "ワーカープロフィール", icon: Briefcase },
-                { href: "/account/worker/payout", label: "報酬振込先", icon: CreditCard },
+                { href: "/account/worker/payout", label: "報酬", icon: CreditCard },
             ],
         },
     ];
@@ -78,6 +77,19 @@ export default function AccountLayout({
                                 </nav>
                             </div>
                         ))}
+                        
+                        {/* 公開プロフィールへのリンク */}
+                        {user && (
+                            <div className="border-t border-gray-100 p-2">
+                                <Link
+                                    href={`/users/${user.uid}`}
+                                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-primary hover:bg-primary/10"
+                                >
+                                    <ExternalLink size={18} />
+                                    公開プロフィールを見る
+                                </Link>
+                            </div>
+                        )}
                     </div>
                 </aside>
 

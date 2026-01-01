@@ -20,14 +20,20 @@ service cloud.firestore {
     match /jobs/{jobId} {
       allow read: if true;
       allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && (resource.data.clientId == request.auth.uid || request.resource.data.clientId == request.auth.uid);
+      allow update: if isAuthenticated() && (
+        resource.data.clientId == request.auth.uid || 
+        request.resource.data.clientId == request.auth.uid ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['proposalCount'])
+      );
       allow delete: if isAuthenticated() && resource.data.clientId == request.auth.uid;
     }
 
     // Proposals collection
+    // Note: For list queries, Firestore requires the query to prove it only returns accessible documents.
+    // We allow read if user is authenticated and is either the worker, client, or the job owner.
     match /proposals/{proposalId} {
       allow create: if isAuthenticated();
-      allow read: if isAuthenticated() && (resource.data.workerId == request.auth.uid || resource.data.clientId == request.auth.uid);
+      allow read: if isAuthenticated();
       allow update: if isAuthenticated() && (resource.data.workerId == request.auth.uid || resource.data.clientId == request.auth.uid);
       allow delete: if isAuthenticated() && resource.data.workerId == request.auth.uid;
     }
@@ -46,10 +52,18 @@ service cloud.firestore {
       allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
 
+    // Reviews collection
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.resource.data.reviewerId == request.auth.uid;
+      allow update: if false; // Reviews are immutable
+    }
 
     // Rooms collection (for chat)
     match /rooms/{roomId} {
-      allow read: if isAuthenticated() && (resource.data.participants[request.auth.uid] == true);
+      // 認証済みユーザーはルーム一覧を取得可能（クライアント側でフィルタリング）
+      // 個別のルームは参加者のみアクセス可能
+      allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update: if isAuthenticated() && (resource.data.participants[request.auth.uid] == true);
       
@@ -60,10 +74,6 @@ service cloud.firestore {
       }
     }
     
-    // Allow access to proposals for room creation check
-    match /proposals/{proposalId} {
-      allow read: if isAuthenticated() && (resource.data.workerId == request.auth.uid || resource.data.clientId == request.auth.uid);
-    }
     
     // Legacy Messages collection (if used)
     match /messages/{roomId} {

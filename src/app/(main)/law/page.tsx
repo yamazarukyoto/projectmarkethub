@@ -22,7 +22,7 @@ export default function LawPage() {
                         </tr>
                         <tr className="border-b border-gray-100">
                             <th className="py-4 px-6 bg-gray-50 font-semibold text-secondary">連絡先メールアドレス</th>
-                            <td className="py-4 px-6 text-text-body">service@meeting-agency.com</td>
+                            <td className="py-4 px-6 text-text-body">service@pj-markethub.com</td>
                         </tr>
                         <tr className="border-b border-gray-100">
                             <th className="py-4 px-6 bg-gray-50 font-semibold text-secondary">電話番号</th>
@@ -31,8 +31,8 @@ export default function LawPage() {
                         <tr className="border-b border-gray-100">
                             <th className="py-4 px-6 bg-gray-50 font-semibold text-secondary">サイトURL</th>
                             <td className="py-4 px-6 text-text-body">
-                                <a href="https://project-market-hub.com/" className="text-primary hover:underline">
-                                    https://project-market-hub.com/
+                                <a href="https://pj-markethub.com/" className="text-primary hover:underline">
+                                    https://pj-markethub.com/
                                 </a>
                             </td>
                         </tr>

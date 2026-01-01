@@ -39,25 +39,41 @@ const CheckoutForm = ({ onSuccess, onClose }: { onSuccess: () => void; onClose: 
     const { error, paymentIntent } = await stripe.confirmPayment({
       elements,
       confirmParams: {
-        // 決済完了後のリダイレクト先は指定しない（SPA内で完結させるため）
-        // redirect: "if_required" を使用する
+        // 3Dセキュア認証後のリダイレクト先
         return_url: window.location.href,
       },
       redirect: "if_required",
     });
 
     if (error) {
+      // 3Dセキュアでリダイレクトが発生した場合、errorは発生しない
+      // ユーザーがキャンセルした場合などにエラーが発生
       setErrorMessage(error.message ?? "決済に失敗しました。");
       setIsProcessing(false);
-    } else if (paymentIntent && paymentIntent.status === "requires_capture") {
-      // 仮払い成功 (manual captureなので requires_capture になるはず)
-      onSuccess();
-    } else if (paymentIntent && paymentIntent.status === "succeeded") {
-        // 万が一即時決済された場合も成功扱い
+    } else if (paymentIntent) {
+      console.log("PaymentIntent status:", paymentIntent.status);
+      // requires_capture: 仮払い成功 (manual capture)
+      // requires_action: 3Dセキュア認証が必要（リダイレクトされる）
+      // processing: 処理中
+      // succeeded: 即時決済成功
+      if (paymentIntent.status === "requires_capture" || paymentIntent.status === "succeeded") {
         onSuccess();
+      } else if (paymentIntent.status === "requires_action") {
+        // 3Dセキュア認証が必要 - Stripeが自動的にリダイレクトを処理
+        // この場合、ユーザーは認証後にreturn_urlに戻ってくる
+        console.log("3D Secure authentication required, redirecting...");
+        // リダイレクトが発生するので、ここでは何もしない
+      } else if (paymentIntent.status === "processing") {
+        // 処理中 - 少し待ってから再確認
+        setErrorMessage("決済処理中です。しばらくお待ちください。");
+        setIsProcessing(false);
+      } else {
+        setErrorMessage("予期せぬステータスです: " + paymentIntent.status);
+        setIsProcessing(false);
+      }
     } else {
-      setErrorMessage("予期せぬステータスです: " + (paymentIntent?.status ?? "unknown"));
-      setIsProcessing(false);
+      // paymentIntentがnullの場合、リダイレクトが発生した可能性
+      console.log("No paymentIntent returned - redirect may have occurred");
     }
   };
 
@@ -89,14 +105,14 @@ export const PaymentModal = ({ isOpen, onClose, clientSecret, onSuccess }: Payme
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-        <div className="flex justify-between items-center p-4 border-b">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
+        <div className="flex justify-between items-center p-4 border-b shrink-0">
           <h3 className="text-lg font-semibold text-gray-900">仮払い手続き</h3>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
             <X size={20} />
           </button>
         </div>
-        <div className="p-6">
+        <div className="p-6 overflow-y-auto">
           <p className="text-sm text-gray-600 mb-4">
             クレジットカード情報を入力してください。この段階では決済は確定せず、仮払い（与信枠の確保）となります。
             検収完了時に決済が確定します。

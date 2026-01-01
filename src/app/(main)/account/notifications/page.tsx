@@ -90,37 +90,6 @@ export default function NotificationSettingsPage() {
               </label>
             </div>
 
-            <div className="flex items-center justify-between py-4 border-b border-gray-100">
-              <div>
-                <h3 className="font-medium text-gray-900">スカウトメール</h3>
-                <p className="text-sm text-gray-500">クライアントからのスカウト通知。</p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  className="sr-only peer" 
-                  checked={settings.emailScout}
-                  onChange={(e) => setSettings({ ...settings, emailScout: e.target.checked })}
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-              </label>
-            </div>
-
-            <div className="flex items-center justify-between py-4">
-              <div>
-                <h3 className="font-medium text-gray-900">デイリーサマリー</h3>
-                <p className="text-sm text-gray-500">おすすめ案件などのまとめメール。</p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  className="sr-only peer" 
-                  checked={settings.emailDaily}
-                  onChange={(e) => setSettings({ ...settings, emailDaily: e.target.checked })}
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-              </label>
-            </div>
           </div>
 
           <div className="pt-4">

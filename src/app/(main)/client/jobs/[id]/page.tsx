@@ -29,12 +29,21 @@ export default function ClientJobDetailPage() {
                     setJob(jobData);
 
                     if (jobData && jobData.clientId === user?.uid) {
-                        const proposalsData = await getProposals(jobId);
-                        setProposals(proposalsData);
+                        try {
+                            // セキュリティルールで認証済みユーザーはproposalsを読めるように設定済み
+                            const proposalsData = await getProposals(jobId);
+                            setProposals(proposalsData);
+                        } catch (error) {
+                            console.error("Error fetching proposals:", error);
+                        }
                         
                         // 契約情報も取得して、採用済みの提案と紐付ける
-                        const contractsData = await getContractsForJob(jobId);
-                        setContracts(contractsData);
+                        try {
+                            const contractsData = await getContractsForJob(jobId);
+                            setContracts(contractsData);
+                        } catch (error) {
+                            console.error("Error fetching contracts:", error);
+                        }
                     }
                 }
             } catch (error) {
@@ -84,12 +93,13 @@ export default function ClientJobDetailPage() {
                         <CardHeader>
                             <div className="flex flex-col md:flex-row justify-between items-start gap-4">
                                 <CardTitle className="text-2xl font-bold text-secondary">{job.title}</CardTitle>
-                                <span className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${job.status === 'open' ? 'bg-green-100 text-green-800' :
+                                <span className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+                                    job.status === 'open' ? (job.proposalCount > 0 ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800') :
                                     job.status === 'filled' ? 'bg-blue-100 text-blue-800' :
-                                        'bg-gray-100 text-gray-800'
-                                    }`}>
-                                    {job.status === 'open' ? '募集中' :
-                                        job.status === 'filled' ? '契約中' : '終了'}
+                                    'bg-gray-100 text-gray-800'
+                                }`}>
+                                    {job.status === 'open' ? (job.proposalCount > 0 ? '選定中' : '募集中') :
+                                     job.status === 'filled' ? '契約中' : '終了'}
                                 </span>
                             </div>
                         </CardHeader>
@@ -133,16 +143,16 @@ export default function ClientJobDetailPage() {
                                         <Paperclip size={16} /> 添付ファイル
                                     </h3>
                                     <div className="space-y-2">
-                                        {job.attachments.map((url, index) => (
+                                        {job.attachments.map((att, index) => (
                                             <a 
                                                 key={index} 
-                                                href={url} 
+                                                href={att.url} 
                                                 target="_blank" 
                                                 rel="noopener noreferrer"
                                                 className="flex items-center gap-2 p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors text-sm text-primary"
                                             >
                                                 <Download size={14} />
-                                                <span>添付ファイル {index + 1}</span>
+                                                <span>{att.name}</span>
                                             </a>
                                         ))}
                                     </div>
@@ -189,52 +199,11 @@ export default function ClientJobDetailPage() {
                                         <div className="flex flex-col sm:flex-row gap-2">
                                             <Button 
                                                 size="sm" 
-                                                variant="outline" 
                                                 className="flex-1 whitespace-nowrap"
                                                 onClick={() => router.push(`/messages/${proposal.id}`)}
                                             >
                                                 詳細・交渉
                                             </Button>
-                                            {job.status === 'open' && (
-                                                <Button
-                                                    size="sm"
-                                                    className="flex-1 whitespace-nowrap"
-                                                    onClick={async () => {
-                                                        if (!confirm("この提案を採用して契約に進みますか？")) return;
-                                                        try {
-                                                            const token = await auth.currentUser?.getIdToken();
-                                                            const res = await fetch("/api/contracts/create", {
-                                                                method: "POST",
-                                                                headers: { 
-                                                                    "Content-Type": "application/json",
-                                                                    Authorization: `Bearer ${token}`,
-                                                                },
-                                                                body: JSON.stringify({
-                                                                    proposalId: proposal.id,
-                                                                    jobId: job.id,
-                                                                    clientId: user?.uid,
-                                                                    workerId: proposal.workerId,
-                                                                    price: proposal.price,
-                                                                    title: job.title,
-                                                                }),
-                                                            });
-                                                            const data = await res.json();
-                                                            if (data.error) {
-                                                                alert(data.error);
-                                                            } else {
-                                                                alert("契約が作成されました。仮決済へ進みます。");
-                                                                // Redirect to contract detail page
-                                                                router.push(`/client/contracts/${data.contractId}`);
-                                                            }
-                                                        } catch (err) {
-                                                            console.error(err);
-                                                            alert("エラーが発生しました");
-                                                        }
-                                                    }}
-                                                >
-                                                    採用する
-                                                </Button>
-                                            )}
                                             {proposal.status === 'hired' && (
                                                 <div className="flex-1 flex gap-2">
                                                     <div className="flex-1 text-center text-sm font-bold text-green-600 bg-green-50 py-2 rounded flex items-center justify-center">

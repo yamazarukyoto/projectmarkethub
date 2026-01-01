@@ -56,10 +56,16 @@ export interface User {
         emailDaily: boolean;
     };
 
-    // Stats
+    // Stats (総合評価 - 後方互換性のため維持)
     rating: number;
     reviewCount: number;
     jobsCompleted: number;
+    
+    // Stats (役割別評価)
+    clientRating?: number;      // クライアントとしての評価（ワーカーから受けた評価）
+    clientReviewCount?: number; // クライアントとしての評価件数
+    workerRating?: number;      // ワーカーとしての評価（クライアントから受けた評価）
+    workerReviewCount?: number; // ワーカーとしての評価件数
 }
 
 export interface Job {
@@ -72,7 +78,7 @@ export interface Job {
     description: string;
     category: string;
     tags: string[];
-    attachments?: string[];
+    attachments?: { name: string; url: string }[];
     
     type: 'project';
     budgetType: 'fixed';
@@ -98,7 +104,7 @@ export interface Proposal {
     price: number;
     message: string;
     estimatedDuration: string;
-    attachments: string[];
+    attachments: { name: string; url: string }[];
     
     status: 'pending' | 'interviewing' | 'rejected' | 'hired' | 'adopted';
     
@@ -137,18 +143,45 @@ export interface Contract {
         | 'submitted'
         | 'disputed'
         | 'completed'
-        | 'cancelled';
+        | 'cancelled'
+        | 'transfer_failed';
 
     stripePaymentIntentId: string;
     stripeTransferId?: string;
     
-    deliveryFileUrl?: string;
+    deliveryFiles?: { name: string; url: string }[];
+    deliveryFileUrl?: string; // Backward compatibility
     deliveryMessage?: string;
     
     createdAt: Timestamp;
     escrowAt?: Timestamp;
     submittedAt?: Timestamp;
     completedAt?: Timestamp;
+    clientReviewed?: boolean;
+    workerReviewed?: boolean;
+    
+    // キャンセル関連
+    cancelRequestedBy?: string;      // キャンセル申請者のUID
+    cancelRequestedAt?: Timestamp;   // キャンセル申請日時
+    cancelReason?: string;           // キャンセル理由
+    cancelApprovedBy?: string;       // キャンセル承認者のUID
+    cancelApprovedAt?: Timestamp;    // キャンセル承認日時
+    cancelledAt?: Timestamp;         // キャンセル完了日時
+    
+    // 連絡不通報告
+    noContactReportedAt?: Timestamp; // 連絡不通報告日時
+    noContactReportReason?: string;  // 連絡不通報告理由
+}
+
+export interface Review {
+    id: string;
+    contractId: string;
+    reviewerId: string;
+    revieweeId: string;
+    rating: number;
+    comment: string;
+    role: 'client' | 'worker';
+    createdAt: Timestamp;
 }
 
 export interface Notification {

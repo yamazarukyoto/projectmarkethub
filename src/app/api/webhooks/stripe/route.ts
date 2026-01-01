@@ -53,6 +53,36 @@ export async function POST(req: Request) {
                 }
                 break;
             }
+            case "account.updated": {
+                const account = event.data.object as import("stripe").Stripe.Account;
+                // Connectアカウントの更新イベント
+                // ユーザーIDを特定する必要があるが、accountオブジェクトにはmetadataが含まれていない場合がある
+                // そのため、stripeAccountIdでユーザーを検索する
+                const usersRef = db.collection("users");
+                const snapshot = await usersRef.where("stripeAccountId", "==", account.id).limit(1).get();
+                
+                if (!snapshot.empty) {
+                    const userDoc = snapshot.docs[0];
+                    const userId = userDoc.id;
+                    
+                    // 本人確認状態の同期
+                    // charges_enabled と payouts_enabled が true なら本人確認完了とみなす
+                    if (account.charges_enabled && account.payouts_enabled) {
+                        await userDoc.ref.update({
+                            verificationStatus: "approved",
+                            stripeOnboardingComplete: true,
+                            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                        });
+                        console.log(`User ${userId} verification approved via Connect Account update.`);
+                    } else if (account.requirements?.currently_due && account.requirements.currently_due.length > 0) {
+                        // 要件が残っている場合は pending または rejected
+                        // ここでは厳密に rejected にせず、pending のままにするか、UI側で判定させる
+                        // ただし、verificationStatus を更新することで、Identity機能との統合を図る
+                        // await userDoc.ref.update({ verificationStatus: "pending" });
+                    }
+                }
+                break;
+            }
             case "payment_intent.amount_capturable_updated":
             case "payment_intent.succeeded": {
                 const paymentIntent = event.data.object as import("stripe").Stripe.PaymentIntent;

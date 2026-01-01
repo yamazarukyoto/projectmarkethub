@@ -11,6 +11,7 @@ steps:
       '--build-arg', 'NEXT_PUBLIC_FIREBASE_APP_ID=${_NEXT_PUBLIC_FIREBASE_APP_ID}',
       '--build-arg', 'NEXT_PUBLIC_BASE_URL=${_NEXT_PUBLIC_BASE_URL}',
       '--build-arg', 'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}',
+      '--build-arg', 'NEXT_PUBLIC_API_URL=${_NEXT_PUBLIC_API_URL}',
       '.'
     ]
 images:
@@ -23,5 +24,6 @@ substitutions:
   _NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: 'projectmarkethub-db904.firebasestorage.app'
   _NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '173689610587'
   _NEXT_PUBLIC_FIREBASE_APP_ID: '1:173689610587:web:ea5e28f0e2e65e6cb43a7e'
-  _NEXT_PUBLIC_BASE_URL: 'https://project-market-hub.com'
+  _NEXT_PUBLIC_BASE_URL: 'https://pj-markethub.com'
   _NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'pk_test_51SM2wG8IGGSBqsbGMda1pqXnVHrKQlapODosqa5f2hRDb29Nqdnfh4vTZkKsOMKSlCYO32NQ6jQ0IaPJcckf5Ine00ocvGelY7'
+  _NEXT_PUBLIC_API_URL: 'https://projectmarkethub-5ckpwmqfza-an.a.run.app'

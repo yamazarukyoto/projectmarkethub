@@ -39,6 +39,39 @@ export default function ClientDashboard() {
         return job.status === filter;
     });
 
+    const getStatusBadge = (job: Job) => {
+        let label = "";
+        let style = "";
+
+        if (job.status === 'open') {
+            if (job.proposalCount > 0) {
+                label = "選定中";
+                style = "bg-purple-100 text-purple-800";
+            } else {
+                label = "募集中";
+                style = "bg-blue-100 text-blue-800";
+            }
+        } else if (job.status === 'filled') {
+            label = "契約済";
+            style = "bg-green-100 text-green-800";
+        } else if (job.status === 'closed') {
+            label = "終了";
+            style = "bg-gray-100 text-gray-800";
+        } else if (job.status === 'cancelled') {
+            label = "キャンセル";
+            style = "bg-red-100 text-red-800";
+        } else {
+            label = job.status;
+            style = "bg-gray-100 text-gray-800";
+        }
+        
+        return (
+            <span className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${style}`}>
+                {label}
+            </span>
+        );
+    };
+
     return (
         <div className="container mx-auto px-4 py-8">
             <div className="flex justify-between items-center mb-8">
@@ -151,13 +184,7 @@ export default function ClientDashboard() {
                                             </div>
                                         </div>
                                         <div className="flex flex-row md:flex-col items-center md:items-end gap-2 w-full md:w-auto justify-between md:justify-start">
-                                            <span className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${job.status === 'open' ? 'bg-green-100 text-green-800' :
-                                                    job.status === 'filled' ? 'bg-blue-100 text-blue-800' :
-                                                        'bg-gray-100 text-gray-800'
-                                                }`}>
-                                                {job.status === 'open' ? '募集中' :
-                                                    job.status === 'filled' ? '契約中' : '終了'}
-                                            </span>
+                                            {getStatusBadge(job)}
                                             <span className="text-xs text-gray-400 whitespace-nowrap">
                                                 {job.createdAt.toDate().toLocaleDateString()}
                                             </span>

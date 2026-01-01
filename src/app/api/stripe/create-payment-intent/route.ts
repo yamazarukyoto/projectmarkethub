@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
+import * as admin from "firebase-admin";
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,6 +26,7 @@ export async function POST(req: NextRequest) {
     let workerStripeAccountId = null;
     const metadata: Record<string, string> = { clientId: userId, type: "escrow" };
     let targetRef = null;
+    let existingPaymentIntentId = null;
 
     if (contractId) {
         // --- プロジェクト方式（契約後の仮決済） ---
@@ -40,11 +42,12 @@ export async function POST(req: NextRequest) {
         const workerDoc = await adminDb.collection("users").doc(contract?.workerId).get();
         workerStripeAccountId = workerDoc.data()?.stripeAccountId;
         
-        amount = contract?.totalAmount;
+        amount = Math.round(contract?.totalAmount);
         platformFee = Math.floor(contract?.amount * 0.05);
         metadata.contractId = contractId;
         metadata.workerId = contract?.workerId;
         targetRef = adminDb.collection("contracts").doc(contractId);
+        existingPaymentIntentId = contract?.stripePaymentIntentId;
 
     } else if (jobId) {
         // --- コンペ・タスク方式（募集時の仮決済） ---
@@ -57,24 +60,13 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
-        // 金額計算 (税込)
-        // コンペ・タスクの場合は募集時に総額を支払う
-        // job.budget は税込総額として扱うか、税抜として扱うか仕様によるが、
-        // ここでは job.budget を支払総額とする（簡易化のため）
-        // 本来は消費税計算が必要
         amount = job?.budget || reqAmount; 
-        
-        // ワーカー未定のため transfer_data は設定しない（プラットフォーム収納代行）
-        // 手数料は後で Transfer 時に徴収するため、ここでは設定しないか、
-        // あるいは全額プラットフォームに入金されるので問題ない。
-        
         metadata.jobId = jobId;
         targetRef = adminDb.collection("jobs").doc(jobId);
+        existingPaymentIntentId = job?.stripePaymentIntentId;
     }
 
-    // Stripeが無効な場合のデモ動作（本番環境では常にStripe決済を使用）
-    // 注意: デモモードは開発環境でのみ使用
-    // 修正: テスト環境でもStripeを使用するように条件を緩和（sk_test_も許可）
+    // Stripeが無効な場合のデモ動作
     const isStripeConfigured = process.env.STRIPE_SECRET_KEY && 
                                process.env.STRIPE_SECRET_KEY !== 'dummy_key';
     
@@ -84,12 +76,12 @@ export async function POST(req: NextRequest) {
       if (contractId) {
           await targetRef?.update({
             status: "escrow",
-            escrowAt: new Date(),
+            escrowAt: admin.firestore.FieldValue.serverTimestamp(),
             stripePaymentIntentId: "demo_payment_intent_id",
           });
       } else if (jobId) {
           await targetRef?.update({
-            status: "open", // 決済完了で公開
+            status: "open",
             stripePaymentIntentId: "demo_payment_intent_id",
           });
       }
@@ -97,23 +89,61 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ skipped: true });
     }
 
-    // 6. PaymentIntent作成
+    // 金額チェック
+    if (amount < 50) {
+        return NextResponse.json({ 
+            error: "決済金額が少なすぎます。50円以上の金額を設定してください。" 
+        }, { status: 400 });
+    }
+
+    // 既存のPaymentIntentを確認して再利用またはステータス反映
+    if (existingPaymentIntentId && existingPaymentIntentId !== "demo_payment_intent_id") {
+        try {
+            const existingPi = await stripe.paymentIntents.retrieve(existingPaymentIntentId);
+            
+            // 既に仮払い成功している場合
+            if (existingPi.status === 'requires_capture' || existingPi.status === 'succeeded') {
+                // DBステータスを更新して完了扱いにする
+                if (contractId) {
+                    await targetRef?.update({
+                        status: "escrow",
+                        escrowAt: admin.firestore.FieldValue.serverTimestamp(),
+                        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    });
+                } else if (jobId) {
+                    await targetRef?.update({
+                        status: "open",
+                        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    });
+                }
+                // フロントエンドにはスキップ（完了）として通知
+                return NextResponse.json({ skipped: true, message: "Payment already authorized" });
+            }
+
+            // まだ有効な進行中ステータスの場合、再利用する
+            if (['requires_payment_method', 'requires_confirmation', 'requires_action'].includes(existingPi.status)) {
+                // 金額が一致する場合のみ再利用
+                if (existingPi.amount === amount) {
+                     return NextResponse.json({ clientSecret: existingPi.client_secret });
+                }
+            }
+            
+            // canceled などの場合は新規作成へ進む
+        } catch (e) {
+            console.warn("Failed to retrieve existing payment intent:", e);
+            // エラー時は無視して新規作成へ
+        }
+    }
+
+    // 6. PaymentIntent作成 (新規)
     const paymentIntentParams: import("stripe").Stripe.PaymentIntentCreateParams = {
       amount: amount,
       currency: "jpy",
       capture_method: "manual", // 仮決済
       metadata: metadata,
-      payment_method_types: ['card'], // カード決済のみを許可（Link等の干渉回避）
+      payment_method_types: ['card'], // カード決済のみを許可
       description: contractId ? `Contract: ${contractId}` : `Job: ${jobId}`,
     };
-
-    // 契約あり（プロジェクト方式）の場合は送金先指定
-    if (workerStripeAccountId) {
-        paymentIntentParams.transfer_data = {
-            destination: workerStripeAccountId,
-        };
-        paymentIntentParams.application_fee_amount = platformFee;
-    }
 
     const paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
 
@@ -126,14 +156,6 @@ export async function POST(req: NextRequest) {
 
   } catch (error: unknown) {
     console.error("Error creating payment intent:", error);
-    
-    // Stripeエラーの場合はデモとして処理する
-    console.warn("Stripe error occurred, falling back to demo mode.");
-    
-    // 注意: req.json() は一度しか読めないため、tryブロック内で取得した contractId を使用するべきだが、
-    // ここではスコープ外のため、本来は変数を外に出すべき。
-    // しかし、既存コードのロジックを尊重しつつ、安全に修正する。
-    
     const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }

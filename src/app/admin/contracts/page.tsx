@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Contract } from "@/types";
+import Link from "next/link";
 
 export default function AdminContractsPage() {
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -45,8 +46,12 @@ export default function AdminContractsPage() {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {contracts.map((contract) => (
-              <tr key={contract.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{contract.id.substring(0, 8)}...</td>
+              <tr key={contract.id} className="hover:bg-gray-50 cursor-pointer">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <Link href={`/admin/contracts/${contract.id}`} className="hover:underline text-blue-600">
+                    {contract.id.substring(0, 8)}...
+                  </Link>
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{contract.jobTitle}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{contract.clientId.substring(0, 8)}...</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{contract.workerId.substring(0, 8)}...</td>
@@ -56,9 +61,10 @@ export default function AdminContractsPage() {
                     contract.status === 'completed' ? 'bg-green-100 text-green-800' : 
                     contract.status === 'cancelled' ? 'bg-red-100 text-red-800' : 
                     contract.status === 'disputed' ? 'bg-red-100 text-red-800' :
+                    contract.cancelRequestedBy ? 'bg-orange-100 text-orange-800' :
                     'bg-blue-100 text-blue-800'
                   }`}>
-                    {contract.status}
+                    {contract.cancelRequestedBy ? `${contract.status} (キャンセル申請中)` : contract.status}
                   </span>
                 </td>
               </tr>

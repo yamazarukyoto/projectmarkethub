@@ -33,7 +33,7 @@ export const Footer = () => {
                     <div>
                         <h4 className="font-semibold mb-4">お問い合わせ</h4>
                         <p className="text-sm text-gray-300 mb-2">
-                            service@meeting-agency.com
+                            service@pj-markethub.com
                         </p>
                         <div className="flex gap-4 mt-4">
                             {/* Social Icons could go here */}
@@ -42,7 +42,7 @@ export const Footer = () => {
                 </div>
 
                 <div className="border-t border-gray-700 mt-8 pt-8 text-center text-sm text-gray-400">
-                    © {new Date().getFullYear()} Project Market Hub. All rights reserved.
+                    {new Date().getFullYear()} Project Market Hub. All rights reserved.
                 </div>
             </div>
         </footer>

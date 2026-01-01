@@ -77,37 +77,43 @@ export default function WorkerJobDetailPage() {
         fetchData();
     }, [params.id, user]);
 
-    const uploadFiles = async (files: File[]): Promise<string[]> => {
-        const urls: string[] = [];
+    const uploadFiles = async (files: File[]): Promise<{ name: string; url: string }[]> => {
+        const attachments: { name: string; url: string }[] = [];
         for (const file of files) {
             const storageRef = ref(storage, `proposal-attachments/${Date.now()}_${file.name}`);
             await uploadBytes(storageRef, file);
             const url = await getDownloadURL(storageRef);
-            urls.push(url);
+            attachments.push({ name: file.name, url });
         }
-        return urls;
+        return attachments;
     };
 
     const onSubmit = async (data: ProposalFormValues) => {
         if (!user || !job) return;
+
+        if (!user.stripeOnboardingComplete) {
+            alert("応募するには、本人確認（Stripe連携）を完了させてください。");
+            router.push("/account/worker/payout");
+            return;
+        }
         
         setSubmitting(true);
         try {
-            const attachmentUrls = await uploadFiles(files);
+            const attachments = await uploadFiles(files);
 
             const proposalId = await createProposal({
                 jobId: job.id,
                 clientId: job.clientId,
                 workerId: user.uid,
-                workerName: user.displayName,
-                workerPhotoURL: user.photoURL,
+                workerName: user.displayName || "Unknown",
+                workerPhotoURL: user.photoURL || "",
                 price: data.price,
                 message: data.message,
                 estimatedDuration: data.estimatedDuration,
                 status: "pending",
                 createdAt: Timestamp.now(),
                 updatedAt: Timestamp.now(),
-                attachments: attachmentUrls,
+                attachments,
                 negotiationHistory: [],
             });
             setHasApplied(true);
@@ -115,8 +121,8 @@ export default function WorkerJobDetailPage() {
             alert("応募が完了しました！メッセージルームへ移動します。");
             router.push(`/messages/${proposalId}`);
         } catch (err) {
-            console.error(err);
-            alert("エラーが発生しました");
+            console.error("Proposal creation failed:", err);
+            alert(`エラーが発生しました: ${err instanceof Error ? err.message : "不明なエラー"}`);
         } finally {
             setSubmitting(false);
         }
@@ -205,16 +211,16 @@ export default function WorkerJobDetailPage() {
                                         <Paperclip size={16} /> 添付ファイル
                                     </h3>
                                     <div className="space-y-2">
-                                        {job.attachments.map((url, index) => (
+                                        {job.attachments.map((att, index) => (
                                             <a 
                                                 key={index} 
-                                                href={url} 
+                                                href={att.url} 
                                                 target="_blank" 
                                                 rel="noopener noreferrer"
                                                 className="flex items-center gap-2 p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors text-sm text-primary"
                                             >
                                                 <Download size={14} />
-                                                <span>添付ファイル {index + 1}</span>
+                                                <span>{att.name}</span>
                                             </a>
                                         ))}
                                     </div>
@@ -263,6 +269,17 @@ export default function WorkerJobDetailPage() {
                                 </div>
                             ) : (
                                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                                    {!user?.stripeOnboardingComplete && (
+                                        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-4 rounded-lg mb-4">
+                                            <p className="text-sm font-medium">
+                                                応募するには、本人確認（Stripe連携）が必要です。
+                                            </p>
+                                            <Link href="/account/worker/payout" className="text-sm underline mt-1 inline-block">
+                                                設定ページへ移動
+                                            </Link>
+                                        </div>
+                                    )}
+
                                     <Input
                                         label="提案金額 (円)"
                                         type="number"
@@ -308,7 +325,7 @@ export default function WorkerJobDetailPage() {
                                             >
                                                 <Upload className="h-6 w-6 text-gray-400" />
                                                 <span className="text-sm text-gray-600">
-                                                    ファイルを選択
+                                                    ファイルを選択 (複数可)
                                                 </span>
                                             </label>
                                         </div>
@@ -333,7 +350,7 @@ export default function WorkerJobDetailPage() {
                                         )}
                                     </div>
 
-                                    <Button type="submit" className="w-full" disabled={submitting}>
+                                    <Button type="submit" className="w-full" disabled={submitting || !user?.stripeOnboardingComplete}>
                                         {submitting ? "送信中..." : "応募する"}
                                     </Button>
                                 </form>

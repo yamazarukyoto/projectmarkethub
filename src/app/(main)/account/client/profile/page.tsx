@@ -8,10 +8,10 @@ import { Building2, Globe, MapPin, Phone, Save } from "lucide-react";
 
 interface ClientProfile {
     companyName?: string;
-    companyWebsite?: string;
+    website?: string;
     companyAddress?: string;
     companyPhone?: string;
-    companyDescription?: string;
+    description?: string;
     industry?: string;
 }
 
@@ -22,10 +22,10 @@ export default function ClientProfilePage() {
     const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
     const [profile, setProfile] = useState<ClientProfile>({
         companyName: "",
-        companyWebsite: "",
+        website: "",
         companyAddress: "",
         companyPhone: "",
-        companyDescription: "",
+        description: "",
         industry: "",
     });
 
@@ -37,13 +37,15 @@ export default function ClientProfilePage() {
                 const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
                 if (userDoc.exists()) {
                     const data = userDoc.data();
+                    // clientProfileオブジェクトから読み取る（フォールバックとしてフラット構造も対応）
+                    const clientProfile = data.clientProfile || {};
                     setProfile({
-                        companyName: data.companyName || "",
-                        companyWebsite: data.companyWebsite || "",
-                        companyAddress: data.companyAddress || "",
-                        companyPhone: data.companyPhone || "",
-                        companyDescription: data.companyDescription || "",
-                        industry: data.industry || "",
+                        companyName: clientProfile.companyName || data.companyName || "",
+                        website: clientProfile.website || data.companyWebsite || "",
+                        companyAddress: clientProfile.companyAddress || data.companyAddress || "",
+                        companyPhone: clientProfile.companyPhone || data.companyPhone || "",
+                        description: clientProfile.description || data.companyDescription || "",
+                        industry: clientProfile.industry || data.industry || "",
                     });
                 }
             } catch (error) {
@@ -64,8 +66,16 @@ export default function ClientProfilePage() {
         setMessage(null);
 
         try {
+            // clientProfileオブジェクトとして保存（設計書に準拠）
             await updateDoc(doc(db, "users", firebaseUser.uid), {
-                ...profile,
+                clientProfile: {
+                    companyName: profile.companyName,
+                    website: profile.website,
+                    companyAddress: profile.companyAddress,
+                    companyPhone: profile.companyPhone,
+                    description: profile.description,
+                    industry: profile.industry,
+                },
                 updatedAt: new Date(),
             });
             setMessage({ type: "success", text: "クライアントプロフィールを更新しました" });
@@ -148,8 +158,8 @@ export default function ClientProfilePage() {
                         </label>
                         <input
                             type="url"
-                            value={profile.companyWebsite}
-                            onChange={(e) => setProfile({ ...profile, companyWebsite: e.target.value })}
+                            value={profile.website}
+                            onChange={(e) => setProfile({ ...profile, website: e.target.value })}
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                             placeholder="https://example.com"
                         />
@@ -188,8 +198,8 @@ export default function ClientProfilePage() {
                             会社紹介
                         </label>
                         <textarea
-                            value={profile.companyDescription}
-                            onChange={(e) => setProfile({ ...profile, companyDescription: e.target.value })}
+                            value={profile.description}
+                            onChange={(e) => setProfile({ ...profile, description: e.target.value })}
                             rows={4}
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                             placeholder="会社の事業内容や特徴を入力してください"

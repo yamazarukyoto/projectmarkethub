@@ -1,4 +1,4 @@
-import { db } from "./firebase";
+import { db, auth } from "./firebase";
 import {
     collection,
     doc,
@@ -11,9 +11,11 @@ import {
     addDoc,
     orderBy,
     limit,
-    Timestamp
+    Timestamp,
+    writeBatch,
+    increment
 } from "firebase/firestore";
-import { User, Job, Proposal, Contract, Notification } from "@/types";
+import { User, Job, Proposal, Contract, Notification, Review } from "@/types";
 
 // User Functions
 export const getUser = async (uid: string): Promise<User | null> => {
@@ -41,6 +43,90 @@ export const updateUserRating = async (uid: string, rating: number, count: numbe
         rating,
         reviewCount: count
     });
+};
+
+// Review Functions
+// revieweeRole: 被評価者の役割（'client' = クライアントとしての評価, 'worker' = ワーカーとしての評価）
+// role === 'client' の場合、クライアントが評価した = ワーカーとしての評価
+// role === 'worker' の場合、ワーカーが評価した = クライアントとしての評価
+export const getUserReviews = async (
+    userId: string, 
+    limitCount: number = 10,
+    revieweeRole?: 'client' | 'worker'  // 被評価者がどの立場で評価されたか
+): Promise<Review[]> => {
+    try {
+        let q;
+        if (revieweeRole) {
+            // 役割別にフィルタリング
+            // revieweeRole === 'worker' の場合、role === 'client' の評価を取得（クライアントがワーカーを評価）
+            // revieweeRole === 'client' の場合、role === 'worker' の評価を取得（ワーカーがクライアントを評価）
+            const reviewerRole = revieweeRole === 'worker' ? 'client' : 'worker';
+            q = query(
+                collection(db, "reviews"),
+                where("revieweeId", "==", userId),
+                where("role", "==", reviewerRole),
+                orderBy("createdAt", "desc"),
+                limit(limitCount)
+            );
+        } else {
+            q = query(
+                collection(db, "reviews"),
+                where("revieweeId", "==", userId),
+                orderBy("createdAt", "desc"),
+                limit(limitCount)
+            );
+        }
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Review));
+    } catch (error) {
+        console.warn("Index might be missing for getUserReviews, falling back to client-side sort:", error);
+        // Fallback: インデックスがない場合はクライアントサイドでソート
+        const q = query(collection(db, "reviews"), where("revieweeId", "==", userId));
+        const querySnapshot = await getDocs(q);
+        let reviews = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Review));
+        
+        // 役割別フィルタリング（クライアントサイド）
+        if (revieweeRole) {
+            const reviewerRole = revieweeRole === 'worker' ? 'client' : 'worker';
+            reviews = reviews.filter(r => r.role === reviewerRole);
+        }
+        
+        return reviews.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis()).slice(0, limitCount);
+    }
+};
+
+export const submitReview = async (
+    contractId: string,
+    reviewerId: string,
+    revieweeId: string,
+    rating: number,
+    comment: string,
+    role: 'client' | 'worker'
+): Promise<void> => {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) throw new Error("Not authenticated");
+
+    // Use Cloud Run direct URL to bypass domain mapping timeout
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+    const res = await fetch(`${apiUrl}/api/reviews/create`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+            contractId,
+            revieweeId,
+            rating,
+            comment,
+            role
+        }),
+    });
+
+    if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to submit review");
+    }
 };
 
 // Job Functions
@@ -88,6 +174,12 @@ export const getJobs = async (category?: string): Promise<Job[]> => {
 export const createProposal = async (proposal: Omit<Proposal, "id">): Promise<string> => {
     const docRef = await addDoc(collection(db, "proposals"), proposal);
     
+    // Update Job proposalCount
+    const jobRef = doc(db, "jobs", proposal.jobId);
+    await updateDoc(jobRef, {
+        proposalCount: increment(1)
+    });
+    
     // Notify Client
     await createNotification({
         userId: proposal.clientId,
@@ -113,9 +205,22 @@ export const getProposal = async (proposalId: string): Promise<Proposal | null> 
 };
 
 export const getProposals = async (jobId: string): Promise<Proposal[]> => {
-    const q = query(collection(db, "proposals"), where("jobId", "==", jobId), orderBy("createdAt", "desc"));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Proposal));
+    // セキュリティルールで認証済みユーザーはproposalsを読めるように設定済み
+    try {
+        const q = query(
+            collection(db, "proposals"), 
+            where("jobId", "==", jobId),
+            orderBy("createdAt", "desc")
+        );
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Proposal));
+    } catch (error) {
+        console.warn("Index might be missing for getProposals, falling back to client-side sort:", error);
+        const q = query(collection(db, "proposals"), where("jobId", "==", jobId));
+        const querySnapshot = await getDocs(q);
+        const proposals = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Proposal));
+        return proposals.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+    }
 };
 
 export const getWorkerProposals = async (workerId: string): Promise<Proposal[]> => {
@@ -205,11 +310,11 @@ export const updateContractStatus = async (contractId: string, status: Contract[
     }
 };
 
-export const submitContractDelivery = async (contractId: string, deliveryFileUrl: string, deliveryMessage: string): Promise<void> => {
+export const submitContractDelivery = async (contractId: string, deliveryFiles: { name: string; url: string }[], deliveryMessage: string): Promise<void> => {
     const docRef = doc(db, "contracts", contractId);
     await updateDoc(docRef, {
         status: 'submitted',
-        deliveryFileUrl,
+        deliveryFiles,
         deliveryMessage,
         submittedAt: Timestamp.now()
     });
@@ -289,10 +394,23 @@ export const createNotification = async (notification: Omit<Notification, "id">)
     return docRef.id;
 };
 
-export const getNotifications = async (userId: string): Promise<Notification[]> => {
-    const q = query(collection(db, "notifications"), where("userId", "==", userId), orderBy("createdAt", "desc"), limit(20));
+export const getNotifications = async (userId: string, limitCount: number = 20): Promise<Notification[]> => {
+    const q = query(collection(db, "notifications"), where("userId", "==", userId), orderBy("createdAt", "desc"), limit(limitCount));
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+};
+
+export const markAllAsRead = async (userId: string): Promise<void> => {
+    const q = query(collection(db, "notifications"), where("userId", "==", userId), where("read", "==", false));
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) return;
+
+    const batch = writeBatch(db);
+    querySnapshot.docs.forEach((doc) => {
+        batch.update(doc.ref, { read: true });
+    });
+    await batch.commit();
 };
 
 export const markAsRead = async (notificationId: string): Promise<void> => {

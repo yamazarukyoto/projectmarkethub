@@ -38,11 +38,11 @@ export function JobCard({ job, userType }: JobCardProps) {
         </div>
         <div className="text-right">
           <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-            job.status === 'open' ? 'bg-green-100 text-green-800' :
+            job.status === 'open' ? (job.proposalCount > 0 ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800') :
             job.status === 'filled' ? 'bg-blue-100 text-blue-800' :
             'bg-gray-100 text-gray-800'
           }`}>
-            {job.status === 'open' ? '募集中' :
+            {job.status === 'open' ? (job.proposalCount > 0 ? '選考中' : '募集中') :
              job.status === 'filled' ? '募集終了' :
              job.status === 'closed' ? '完了' : 'キャンセル'}
           </span>

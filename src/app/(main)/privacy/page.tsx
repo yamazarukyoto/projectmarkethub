@@ -95,7 +95,7 @@ export default function PrivacyPage() {
                         <ul className="space-y-2">
                             <li><span className="font-semibold w-24 inline-block">運営責任者:</span> 山本健太</li>
                             <li><span className="font-semibold w-24 inline-block">所在地:</span> 〒600-8208 京都府京都市下京区小稲荷町85-2 Grand-K 京都駅前ビル 201</li>
-                            <li><span className="font-semibold w-24 inline-block">Email:</span> <a href="mailto:service@meeting-agency.com" className="text-primary hover:underline">service@meeting-agency.com</a></li>
+                            <li><span className="font-semibold w-24 inline-block">Email:</span> <a href="mailto:service@pj-markethub.com" className="text-primary hover:underline">service@pj-markethub.com</a></li>
                         </ul>
                     </div>
                 </section>

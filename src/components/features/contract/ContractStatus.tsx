@@ -19,12 +19,12 @@ export function ContractStatus({ status }: ContractStatusProps) {
         };
       case 'waiting_for_escrow':
         return {
-          label: '仮払い待ち',
+          label: '仮決済待ち',
           icon: Clock,
           color: 'text-yellow-600',
           bg: 'bg-yellow-50',
           border: 'border-yellow-200',
-          description: 'クライアントの仮払い手続きを待っています'
+          description: 'クライアントの仮決済手続きを待っています'
         };
       case 'escrow':
         return {
@@ -33,7 +33,7 @@ export function ContractStatus({ status }: ContractStatusProps) {
           color: 'text-blue-600',
           bg: 'bg-blue-50',
           border: 'border-blue-200',
-          description: '仮払いが完了しました。業務を開始してください'
+          description: '仮決済が完了しました。業務を開始してください'
         };
       case 'in_progress':
         return {

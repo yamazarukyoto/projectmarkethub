@@ -58,27 +58,35 @@ export default function ClientJobsPage() {
         }
     };
 
-    const getStatusBadge = (status: string) => {
-        const styles = {
-            open: "bg-blue-100 text-blue-800",
-            selecting: "bg-purple-100 text-purple-800",
-            closed: "bg-gray-100 text-gray-800",
-            filled: "bg-green-100 text-green-800",
-            cancelled: "bg-red-100 text-red-800",
-        };
-        const labels = {
-            open: "募集中",
-            selecting: "選定中",
-            closed: "終了",
-            filled: "契約済",
-            cancelled: "キャンセル",
-        };
-        
-        const statusKey = status as keyof typeof styles;
+    const getStatusBadge = (job: Job) => {
+        let label = "";
+        let style = "";
+
+        if (job.status === 'open') {
+            if (job.proposalCount > 0) {
+                label = "選定中";
+                style = "bg-purple-100 text-purple-800";
+            } else {
+                label = "募集中";
+                style = "bg-blue-100 text-blue-800";
+            }
+        } else if (job.status === 'filled') {
+            label = "契約済";
+            style = "bg-green-100 text-green-800";
+        } else if (job.status === 'closed') {
+            label = "終了";
+            style = "bg-gray-100 text-gray-800";
+        } else if (job.status === 'cancelled') {
+            label = "キャンセル";
+            style = "bg-red-100 text-red-800";
+        } else {
+            label = job.status;
+            style = "bg-gray-100 text-gray-800";
+        }
         
         return (
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${styles[statusKey] || "bg-gray-100 text-gray-800"}`}>
-                {labels[statusKey] || status}
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${style}`}>
+                {label}
             </span>
         );
     };
@@ -123,7 +131,7 @@ export default function ClientJobsPage() {
                                 <div className="flex flex-col md:flex-row justify-between gap-4">
                                     <div className="flex-1">
                                         <div className="flex items-center gap-3 mb-2">
-                                            {getStatusBadge(job.status)}
+                                            {getStatusBadge(job)}
                                             <span className="text-sm text-gray-500">
                                                 {new Date(job.createdAt.seconds * 1000).toLocaleDateString()}
                                             </span>

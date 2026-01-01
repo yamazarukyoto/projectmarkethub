@@ -19,7 +19,10 @@ https://project-market-hub.com/
 
 ## 代替URL（DNSが設定されるまで使用可能）
 - **Cloud Run**: https://projectmarkethub-5ckpwmqfza-an.a.run.app
+- **Cloud Run (新形式)**: https://projectmarkethub-173689610587.asia-northeast1.run.app
 - **Firebase Hosting**: https://projectmarkethub-db904.web.app
+
+**注意**: Cloud Runには2つのURLがあります。どちらも同じサービスを指しています。
 
 ## プロジェクト情報
 - **GCPプロジェクトID**: `projectmarkethub-db904`
