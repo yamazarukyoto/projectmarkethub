@@ -443,3 +443,19 @@ export const updatePaymentIntentId = async (contractId: string, paymentIntentId:
     const docRef = doc(db, "contracts", contractId);
     await updateDoc(docRef, { stripePaymentIntentId: paymentIntentId });
 };
+
+// Get completed contracts count for a worker
+export const getCompletedContractsCount = async (workerId: string): Promise<number> => {
+    try {
+        const q = query(
+            collection(db, "contracts"),
+            where("workerId", "==", workerId),
+            where("status", "==", "completed")
+        );
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.size;
+    } catch (error) {
+        console.error("Error getting completed contracts count:", error);
+        return 0;
+    }
+};

@@ -768,11 +768,6 @@ export default function MessageRoomPage() {
                                             </>
                                         )}
                                         
-                                        {!contract && (
-                                            <p className="text-xs text-red-500 mt-2">
-                                                ※契約ID取得中または一覧から選択してください
-                                            </p>
-                                        )}
                                     </div>
                                 ) : (
                                     /* 契約前でもデバッグ用にボタンを表示（開発者用） */
@@ -794,10 +789,6 @@ export default function MessageRoomPage() {
                                     {isClient ? "仮決済や検収はこちらから" : "業務開始や納品はこちらから"}
                                 </p>
 
-                                {/* Debug info - temporary */}
-                                <div className="text-[10px] text-gray-400 text-center select-none mt-2 border-t pt-1">
-                                    Debug: Status={proposal.status} / Contract={contract ? contract.id : 'None'} / Err={errorMessage || 'None'}
-                                </div>
                             </div>
                             
                             {/* エラー表示エリア（デバッグ用） */}

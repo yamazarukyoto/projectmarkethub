@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { getUser, getUserReviews } from "@/lib/db";
+import { getUser, getUserReviews, getCompletedContractsCount } from "@/lib/db";
 import { User, Review } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -22,6 +22,7 @@ export default function UserProfilePage() {
     const [reviewerNames, setReviewerNames] = useState<{ [key: string]: string }>({});
     const [activeTab, setActiveTab] = useState<'worker' | 'client'>('worker');
     const [isCreatingRoom, setIsCreatingRoom] = useState(false);
+    const [completedCount, setCompletedCount] = useState<number>(0);
 
     // 直接メッセージ用のルームIDを生成（2人のユーザーIDをソートして結合）
     const generateDMRoomId = (userId1: string, userId2: string): string => {
@@ -87,6 +88,10 @@ export default function UserProfilePage() {
                         }
                     }
                     setReviewerNames(names);
+                    
+                    // 完了案件数を取得（contractsコレクションから実際の数を取得）
+                    const count = await getCompletedContractsCount(params.id as string);
+                    setCompletedCount(count);
                 } catch (error) {
                     console.error("Error fetching user:", error);
                 } finally {
@@ -197,7 +202,7 @@ export default function UserProfilePage() {
                             )}
                             <div className="flex items-center justify-center md:justify-start gap-2 text-gray-600 mb-4">
                                 <Briefcase size={16} />
-                                <span>完了案件: {user.jobsCompleted || 0}件</span>
+                                <span>完了案件: {completedCount}件</span>
                             </div>
                             
                             {/* Message Button (Only if logged in and not self) */}

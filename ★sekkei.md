@@ -2603,6 +2603,59 @@ gcloud run services update projectmarkethub \
 
 ---
 
+## 56. 修正計画（2026-01-02 デバッグ文言の削除）
+
+### 56.1 依頼内容
+メッセージページに表示されている以下のデバッグ用文言を削除する：
+1. 「※契約ID取得中または一覧から選択してください」
+2. 「Debug: Status hired/Contract-None/Err-None」
+
+### 56.2 修正対象ファイル
+`src/app/(main)/messages/[roomId]/page.tsx`
+
+### 56.3 修正内容
+1. 約680行目付近の「※契約ID取得中または一覧から選択してください」を含む`<p>`タグを削除
+2. 約695行目付近の「Debug: Status=...」を含む`<div>`タグを削除
+
+### 56.4 実装手順
+1. `src/app/(main)/messages/[roomId]/page.tsx` を修正
+2. デプロイして動作確認
+
+---
+
+## 57. 修正計画（2026-01-02 公開プロフィールの完了案件数修正）
+
+### 57.1 問題の概要
+公開プロフィールページ（`/users/[id]`）の「完了案件: 6件」が実態と合っていない。
+
+### 57.2 原因分析
+1. **公開プロフィールページ**: `user.jobsCompleted`を表示している（175行目）
+2. **jobsCompletedの更新ロジック**: 検収完了時（`capture-payment-intent`）でも評価作成時（`reviews/create`）でも、`jobsCompleted`は更新されていない
+3. **現在の値**: Firestoreに保存されている古いデータで、実際の完了契約数と一致していない
+
+### 57.3 修正方針
+**アプローチA（採用）**: 公開プロフィールページで、実際の完了契約数をリアルタイムでカウントする
+- `db.ts`に`getCompletedContractsCount`関数を追加
+- 公開プロフィールページで、この関数を使用して完了契約数を取得・表示
+- 他のページには影響を与えない
+
+### 57.4 修正内容
+
+#### 1. db.ts (`src/lib/db.ts`)
+- `getCompletedContractsCount`関数を追加
+- ワーカーIDを指定して、`status === 'completed'`の契約数をカウント
+
+#### 2. 公開プロフィールページ (`src/app/(main)/users/[id]/page.tsx`)
+- `getCompletedContractsCount`関数をインポート
+- `user.jobsCompleted`の代わりに、実際の完了契約数を表示
+
+### 57.5 実装手順
+1. `src/lib/db.ts` - `getCompletedContractsCount`関数を追加
+2. `src/app/(main)/users/[id]/page.tsx` - 完了契約数の取得・表示を修正
+3. デプロイして動作確認
+
+---
+
 ## 55. 修正計画（2026-01-02 検収時キャンセル承認不可・納品物表示制御）
 
 ### 55.1 依頼内容
