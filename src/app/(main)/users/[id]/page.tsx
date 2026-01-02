@@ -22,7 +22,6 @@ export default function UserProfilePage() {
     const [reviewerNames, setReviewerNames] = useState<{ [key: string]: string }>({});
     const [activeTab, setActiveTab] = useState<'worker' | 'client'>('worker');
     const [isCreatingRoom, setIsCreatingRoom] = useState(false);
-    const [completedCount, setCompletedCount] = useState<number>(0);
 
     // 直接メッセージ用のルームIDを生成（2人のユーザーIDをソートして結合）
     const generateDMRoomId = (userId1: string, userId2: string): string => {
@@ -89,17 +88,6 @@ export default function UserProfilePage() {
                     }
                     setReviewerNames(names);
                     
-                    // 完了案件数を取得（APIエンドポイント経由でサーバーサイドで取得）
-                    try {
-                        const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
-                        const response = await fetch(`${apiUrl}/api/users/completed-count?userId=${params.id}`);
-                        if (response.ok) {
-                            const data = await response.json();
-                            setCompletedCount(data.count);
-                        }
-                    } catch (err) {
-                        console.error("Error fetching completed count:", err);
-                    }
                 } catch (error) {
                     console.error("Error fetching user:", error);
                 } finally {
@@ -210,7 +198,7 @@ export default function UserProfilePage() {
                             )}
                             <div className="flex items-center justify-center md:justify-start gap-2 text-gray-600 mb-4">
                                 <Briefcase size={16} />
-                                <span>完了案件: {completedCount}件</span>
+                                <span>完了案件: {(user as any).workerJobsCompleted || 0}件</span>
                             </div>
                             
                             {/* Message Button (Only if logged in and not self) */}
