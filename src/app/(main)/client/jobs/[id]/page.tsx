@@ -144,15 +144,15 @@ export default function ClientJobDetailPage() {
                                     </h3>
                                     <div className="space-y-2">
                                         {job.attachments.map((att, index) => {
+                                            // attが文字列（URL）の場合と、オブジェクト{name, url}の場合の両方に対応
+                                            const attUrl = typeof att === 'string' ? att : att.url;
+                                            const attName = typeof att === 'string' ? '' : (att.name || '');
+                                            
                                             // ファイル名が空の場合、URLからファイル名を抽出
-                                            const getFileName = (attachment: { name: string; url: string }) => {
-                                                if (attachment.name && attachment.name.trim() !== '') {
-                                                    return attachment.name;
-                                                }
-                                                // URLからファイル名を抽出
+                                            const getFileNameFromUrl = (url: string, fallbackIndex: number) => {
                                                 try {
-                                                    const url = new URL(attachment.url);
-                                                    let pathname = decodeURIComponent(url.pathname);
+                                                    const urlObj = new URL(url);
+                                                    let pathname = decodeURIComponent(urlObj.pathname);
                                                     
                                                     // Firebase Storage URL形式: /v0/b/bucket/o/path%2Fto%2Ffile
                                                     // /o/ 以降のパスを取得
@@ -176,26 +176,30 @@ export default function ClientJobDetailPage() {
                                                         const nameParts = lastPart.split('_');
                                                         // 最初の部分が数字（タイムスタンプ）の場合のみスキップ
                                                         if (/^\d+$/.test(nameParts[0])) {
-                                                            return nameParts.slice(1).join('_') || `ファイル${index + 1}`;
+                                                            return nameParts.slice(1).join('_') || `ファイル${fallbackIndex + 1}`;
                                                         }
                                                     }
-                                                    return lastPart || `ファイル${index + 1}`;
+                                                    return lastPart || `ファイル${fallbackIndex + 1}`;
                                                 } catch {
-                                                    return `ファイル${index + 1}`;
+                                                    return `ファイル${fallbackIndex + 1}`;
                                                 }
                                             };
+                                            
+                                            const displayName = attName && attName.trim() !== '' 
+                                                ? attName 
+                                                : getFileNameFromUrl(attUrl, index);
                                             
                                             return (
                                                 <a 
                                                     key={index} 
-                                                    href={att.url} 
+                                                    href={attUrl} 
                                                     target="_blank" 
                                                     rel="noopener noreferrer"
-                                                    download={getFileName(att)}
+                                                    download={displayName}
                                                     className="flex items-center gap-2 p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors text-sm text-primary"
                                                 >
                                                     <Download size={14} />
-                                                    <span className="truncate">{getFileName(att)}</span>
+                                                    <span className="truncate">{displayName}</span>
                                                 </a>
                                             );
                                         })}
