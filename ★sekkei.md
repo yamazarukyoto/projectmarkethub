@@ -2796,3 +2796,80 @@ curl -w "\nTotal time: %{time_total}s\n" -X POST "https://projectmarkethub-5ckpw
 - APIレスポンス時間が0.21秒で正常
 - 複数送信方法のハイブリッドアプローチにより、ネットワーク問題への耐性が大幅に向上
 - 6回試行により、間欠的な問題でも成功率が向上
+
+---
+
+## 60. 修正計画（2026-01-02 CORSエラーの修正）
+
+### 60.1 問題の概要
+「オファーを送信する」ボタンを押すと、CORSエラーが発生して契約が作成されない。
+
+### 60.2 原因分析
+1. **クロスオリジンリクエスト**: `pj-markethub.com`から`projectmarkethub-5ckpwmqfza-an.a.run.app`へのリクエストがクロスオリジンとなる
+2. **X-Request-IDヘッダー**: カスタムヘッダー`X-Request-ID`がCORSで許可されていなかった
+3. **XMLHttpRequest**: XHRでも同様にCORSエラーが発生
+
+### 60.3 修正内容
+
+#### 1. クライアント側 (`src/app/(main)/messages/[roomId]/page.tsx`)
+- `X-Request-ID`ヘッダーを削除（CORSで許可されていないため）
+- `NEXT_PUBLIC_API_URL`環境変数を使用してCloud Run直接URLにリクエスト
+
+#### 2. サーバー側 (`src/app/api/contracts/create/route.ts`)
+- 全てのレスポンスにCORSヘッダーを追加
+  - `Access-Control-Allow-Origin: *`
+  - `Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS`
+  - `Access-Control-Allow-Headers: Content-Type, Authorization`
+- OPTIONSリクエスト（プリフライト）への対応
+
+### 60.4 実装完了（2026-01-02）
+**修正内容:**
+1. `src/app/(main)/messages/[roomId]/page.tsx`から`X-Request-ID`ヘッダーを削除
+2. `src/app/api/contracts/create/route.ts`にCORSヘッダーを追加
+3. Cloud Buildで再ビルド（Build ID: b6207419-b7e5-47d6-a04b-179dbaedd85f、ステータス: SUCCESS）
+4. Cloud Runにデプロイ（リビジョン: projectmarkethub-00150-k59）
+
+**結論:**
+- CORSエラーが解消され、`pj-markethub.com`から`projectmarkethub-5ckpwmqfza-an.a.run.app`へのクロスオリジンリクエストが正常に動作
+
+---
+
+## 61. APIコール設計思想（重要）
+
+### 61.1 背景
+本プラットフォームでは、カスタムドメイン（`pj-markethub.com`）とCloud Run直接URL（`projectmarkethub-5ckpwmqfza-an.a.run.app`）の2つのエンドポイントが存在する。
+
+### 61.2 問題点
+1. **カスタムドメイン経由のタイムアウト**: Cloud Runのドメインマッピングを経由すると、間欠的にタイムアウトが発生する
+2. **CORSの問題**: カスタムドメインからCloud Run直接URLへのリクエストはクロスオリジンとなり、CORSヘッダーが必要
+
+### 61.3 設計方針
+
+#### APIコールの基本ルール
+1. **重要なAPIコール（決済、契約作成など）**: Cloud Run直接URL経由で呼び出す
+   - `NEXT_PUBLIC_API_URL`環境変数を使用
+   - CORSヘッダーをサーバー側で設定
+
+2. **通常のAPIコール**: 相対パス（`/api/...`）で呼び出す
+   - カスタムドメイン経由となる
+   - タイムアウトが発生しても致命的でない場合に使用
+
+#### CORSヘッダーの設定
+Cloud Run直接URLを使用するAPIには、以下のCORSヘッダーを設定する：
+```typescript
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+```
+
+#### 環境変数
+- `NEXT_PUBLIC_API_URL`: Cloud Run直接URL（`https://projectmarkethub-5ckpwmqfza-an.a.run.app`）
+- `cloudbuild.yaml`で設定
+
+### 61.4 今後の対応
+新規APIを追加する際は、以下を確認：
+1. 重要なAPIか？ → Cloud Run直接URL経由 + CORSヘッダー設定
+2. 通常のAPIか？ → 相対パスで呼び出し
+3. カスタムヘッダーを使用する場合 → CORSで許可されているか確認
