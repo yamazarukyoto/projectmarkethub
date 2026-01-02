@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { getUser, getUserReviews, getCompletedContractsCount } from "@/lib/db";
+import { getUser, getUserReviews } from "@/lib/db";
 import { User, Review } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -89,9 +89,17 @@ export default function UserProfilePage() {
                     }
                     setReviewerNames(names);
                     
-                    // 完了案件数を取得（contractsコレクションから実際の数を取得）
-                    const count = await getCompletedContractsCount(params.id as string);
-                    setCompletedCount(count);
+                    // 完了案件数を取得（APIエンドポイント経由でサーバーサイドで取得）
+                    try {
+                        const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+                        const response = await fetch(`${apiUrl}/api/users/completed-count?userId=${params.id}`);
+                        if (response.ok) {
+                            const data = await response.json();
+                            setCompletedCount(data.count);
+                        }
+                    } catch (err) {
+                        console.error("Error fetching completed count:", err);
+                    }
                 } catch (error) {
                     console.error("Error fetching user:", error);
                 } finally {
