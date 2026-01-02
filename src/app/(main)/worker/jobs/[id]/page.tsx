@@ -325,7 +325,9 @@ export default function WorkerJobDetailPage() {
                                             {/* メッセージ */}
                                             <div className="mt-3 pt-3 border-t border-gray-200">
                                                 <p className="text-xs text-gray-500 mb-1">メッセージ:</p>
-                                                <p className="text-sm text-gray-700 whitespace-pre-wrap line-clamp-4">{myProposal.message}</p>
+                                                <div className="max-h-32 overflow-y-auto">
+                                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{myProposal.message}</p>
+                                                </div>
                                             </div>
                                             
                                             {/* 添付ファイル */}

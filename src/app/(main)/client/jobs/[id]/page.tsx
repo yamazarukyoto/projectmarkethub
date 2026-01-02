@@ -243,7 +243,9 @@ export default function ClientJobDetailPage() {
                                             <p className="text-sm font-medium">提案金額: {proposal.price.toLocaleString()}円</p>
                                             <p className="text-sm text-gray-500">完了予定: {proposal.estimatedDuration}</p>
                                         </div>
-                                        <p className="text-sm text-gray-700 line-clamp-3 mb-3 whitespace-pre-wrap">{proposal.message}</p>
+                                        <div className="mb-3 max-h-32 overflow-y-auto">
+                                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{proposal.message}</p>
+                                        </div>
                                         {/* 提案の添付ファイル */}
                                         {proposal.attachments && proposal.attachments.length > 0 && (
                                             <div className="mb-3">
