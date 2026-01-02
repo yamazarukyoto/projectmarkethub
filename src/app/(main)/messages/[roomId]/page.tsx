@@ -369,7 +369,6 @@ export default function MessageRoomPage() {
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`,
-                    'X-Request-ID': `${Date.now()}-${attempt}`, // リクエスト追跡用
                 },
                 body: body,
                 signal: controller.signal,
@@ -407,7 +406,6 @@ export default function MessageRoomPage() {
                     xhr.open('POST', apiUrl, true);
                     xhr.setRequestHeader('Content-Type', 'application/json');
                     xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-                    xhr.setRequestHeader('X-Request-ID', `${Date.now()}-${attempt}-xhr`);
                     xhr.timeout = timeoutMs - 2000;
                     
                     xhr.onload = () => {

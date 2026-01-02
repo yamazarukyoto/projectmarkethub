@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server";
 import { adminDb, adminAuth, FieldValue } from "@/lib/firebase-admin";
 
+// CORSヘッダーを追加するヘルパー関数
+const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
 export async function OPTIONS(req: Request) {
     return new NextResponse(null, {
         status: 204,
-        headers: {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        },
+        headers: corsHeaders,
     });
 }
 
@@ -23,7 +26,7 @@ export async function POST(req: Request) {
         const authHeader = req.headers.get("Authorization");
         if (!authHeader?.startsWith("Bearer ")) {
             log("No auth header");
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders });
         }
         
         const token = authHeader.split("Bearer ")[1];
@@ -39,7 +42,7 @@ export async function POST(req: Request) {
             body = await req.json();
         } catch (e) {
             log("Invalid JSON body");
-            return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+            return NextResponse.json({ error: "Invalid JSON body" }, { status: 400, headers: corsHeaders });
         }
 
         const { proposalId, jobId, clientId, workerId, price, title } = body;
@@ -48,12 +51,12 @@ export async function POST(req: Request) {
         // 3. Validation
         if (!jobId || !proposalId || !clientId || !workerId || !price) {
             log("Missing required fields");
-            return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+            return NextResponse.json({ error: "Missing required fields" }, { status: 400, headers: corsHeaders });
         }
 
         if (clientId !== requestUserId) {
             log("Forbidden - clientId mismatch");
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+            return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: corsHeaders });
         }
 
         // 4. Check for existing contract (simple query - no composite index needed)
@@ -69,7 +72,7 @@ export async function POST(req: Request) {
             return NextResponse.json({
                 contractId: activeContract.id,
                 isExisting: true
-            });
+            }, { headers: corsHeaders });
         }
         log("No existing contract");
 
@@ -78,7 +81,7 @@ export async function POST(req: Request) {
         const jobDoc = await adminDb.collection("jobs").doc(jobId).get();
         if (!jobDoc.exists) {
             log("Job not found");
-            return NextResponse.json({ error: "Job not found" }, { status: 404 });
+            return NextResponse.json({ error: "Job not found" }, { status: 404, headers: corsHeaders });
         }
         const jobData = jobDoc.data();
         log("Job fetched");
@@ -115,13 +118,13 @@ export async function POST(req: Request) {
         log("Updates complete");
 
         log("Success");
-        return NextResponse.json({ contractId: contractRef.id });
+        return NextResponse.json({ contractId: contractRef.id }, { headers: corsHeaders });
 
     } catch (error: any) {
         console.error("[Contract Create] Error:", error);
         return NextResponse.json(
             { error: error.message || "Internal Server Error" }, 
-            { status: 500 }
+            { status: 500, headers: corsHeaders }
         );
     }
 }
