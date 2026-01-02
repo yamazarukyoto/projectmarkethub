@@ -152,13 +152,32 @@ export default function ClientJobDetailPage() {
                                                 // URLからファイル名を抽出
                                                 try {
                                                     const url = new URL(attachment.url);
-                                                    const pathname = decodeURIComponent(url.pathname);
+                                                    let pathname = decodeURIComponent(url.pathname);
+                                                    
+                                                    // Firebase Storage URL形式: /v0/b/bucket/o/path%2Fto%2Ffile
+                                                    // /o/ 以降のパスを取得
+                                                    if (pathname.includes('/o/')) {
+                                                        pathname = pathname.split('/o/')[1] || pathname;
+                                                    }
+                                                    
+                                                    // パスの最後の部分を取得
                                                     const parts = pathname.split('/');
-                                                    const lastPart = parts[parts.length - 1];
+                                                    let lastPart = parts[parts.length - 1];
+                                                    
+                                                    // %2F がまだ残っている場合（二重エンコード）
+                                                    if (lastPart.includes('%2F')) {
+                                                        lastPart = decodeURIComponent(lastPart);
+                                                        const subParts = lastPart.split('/');
+                                                        lastPart = subParts[subParts.length - 1];
+                                                    }
+                                                    
                                                     // Firebase Storageの場合、タイムスタンプ_ファイル名の形式
                                                     if (lastPart.includes('_')) {
                                                         const nameParts = lastPart.split('_');
-                                                        return nameParts.slice(1).join('_') || `ファイル${index + 1}`;
+                                                        // 最初の部分が数字（タイムスタンプ）の場合のみスキップ
+                                                        if (/^\d+$/.test(nameParts[0])) {
+                                                            return nameParts.slice(1).join('_') || `ファイル${index + 1}`;
+                                                        }
                                                     }
                                                     return lastPart || `ファイル${index + 1}`;
                                                 } catch {

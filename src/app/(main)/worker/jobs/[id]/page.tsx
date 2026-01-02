@@ -33,6 +33,7 @@ export default function WorkerJobDetailPage() {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [hasApplied, setHasApplied] = useState(false);
+    const [myProposal, setMyProposal] = useState<Proposal | null>(null);
     const [contractId, setContractId] = useState<string | null>(null);
     const [proposalId, setProposalId] = useState<string | null>(null);
     const [files, setFiles] = useState<File[]>([]);
@@ -55,12 +56,13 @@ export default function WorkerJobDetailPage() {
 
                     // Check if already applied
                     const myProposals = await getWorkerProposals(user.uid);
-                    const myProposal = myProposals.find(p => p.jobId === jobId);
-                    const applied = !!myProposal;
+                    const foundProposal = myProposals.find(p => p.jobId === jobId);
+                    const applied = !!foundProposal;
                     setHasApplied(applied);
 
-                    if (applied && myProposal) {
-                        setProposalId(myProposal.id);
+                    if (applied && foundProposal) {
+                        setMyProposal(foundProposal);
+                        setProposalId(foundProposal.id);
                         const contracts = await getContracts(user.uid, 'worker');
                         const myContract = contracts.find(c => c.jobId === jobId);
                         if (myContract) {
@@ -220,13 +222,32 @@ export default function WorkerJobDetailPage() {
                                                 // URLからファイル名を抽出
                                                 try {
                                                     const url = new URL(attachment.url);
-                                                    const pathname = decodeURIComponent(url.pathname);
+                                                    let pathname = decodeURIComponent(url.pathname);
+                                                    
+                                                    // Firebase Storage URL形式: /v0/b/bucket/o/path%2Fto%2Ffile
+                                                    // /o/ 以降のパスを取得
+                                                    if (pathname.includes('/o/')) {
+                                                        pathname = pathname.split('/o/')[1] || pathname;
+                                                    }
+                                                    
+                                                    // パスの最後の部分を取得
                                                     const parts = pathname.split('/');
-                                                    const lastPart = parts[parts.length - 1];
+                                                    let lastPart = parts[parts.length - 1];
+                                                    
+                                                    // %2F がまだ残っている場合（二重エンコード）
+                                                    if (lastPart.includes('%2F')) {
+                                                        lastPart = decodeURIComponent(lastPart);
+                                                        const subParts = lastPart.split('/');
+                                                        lastPart = subParts[subParts.length - 1];
+                                                    }
+                                                    
                                                     // Firebase Storageの場合、タイムスタンプ_ファイル名の形式
                                                     if (lastPart.includes('_')) {
                                                         const nameParts = lastPart.split('_');
-                                                        return nameParts.slice(1).join('_') || `ファイル${index + 1}`;
+                                                        // 最初の部分が数字（タイムスタンプ）の場合のみスキップ
+                                                        if (/^\d+$/.test(nameParts[0])) {
+                                                            return nameParts.slice(1).join('_') || `ファイル${index + 1}`;
+                                                        }
                                                     }
                                                     return lastPart || `ファイル${index + 1}`;
                                                 } catch {
@@ -263,12 +284,92 @@ export default function WorkerJobDetailPage() {
                         </CardHeader>
                         <CardContent>
                             {hasApplied ? (
-                                <div className="text-center py-8">
-                                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                        <CheckCircle className="text-green-600" size={32} />
+                                <div className="py-4">
+                                    <div className="flex items-center justify-center gap-2 mb-4">
+                                        <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                                            <CheckCircle className="text-green-600" size={20} />
+                                        </div>
+                                        <h3 className="text-lg font-bold text-green-800">応募済み</h3>
                                     </div>
-                                    <h3 className="text-lg font-bold text-green-800 mb-2">応募済み</h3>
-                                    <p className="text-gray-600 mb-4">この案件には既に応募しています。</p>
+                                    
+                                    {/* 自分の提案情報を表示 */}
+                                    {myProposal && (
+                                        <div className="bg-gray-50 rounded-lg p-4 mb-4 text-left">
+                                            <h4 className="text-sm font-semibold text-gray-700 mb-3">あなたの提案内容</h4>
+                                            <div className="space-y-2 text-sm">
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500">提案金額:</span>
+                                                    <span className="font-medium">{myProposal.price.toLocaleString()}円</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500">完了予定:</span>
+                                                    <span className="font-medium">{myProposal.estimatedDuration}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500">ステータス:</span>
+                                                    <span className={`font-medium ${
+                                                        myProposal.status === 'hired' ? 'text-green-600' :
+                                                        myProposal.status === 'rejected' ? 'text-red-600' :
+                                                        'text-yellow-600'
+                                                    }`}>
+                                                        {myProposal.status === 'hired' ? '採用' :
+                                                         myProposal.status === 'rejected' ? '不採用' : '選考中'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* メッセージ */}
+                                            <div className="mt-3 pt-3 border-t border-gray-200">
+                                                <p className="text-xs text-gray-500 mb-1">メッセージ:</p>
+                                                <p className="text-sm text-gray-700 whitespace-pre-wrap line-clamp-4">{myProposal.message}</p>
+                                            </div>
+                                            
+                                            {/* 添付ファイル */}
+                                            {myProposal.attachments && myProposal.attachments.length > 0 && (
+                                                <div className="mt-3 pt-3 border-t border-gray-200">
+                                                    <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
+                                                        <Paperclip size={12} /> 添付ファイル
+                                                    </p>
+                                                    <div className="space-y-1">
+                                                        {myProposal.attachments.map((att, index) => {
+                                                            const getFileName = (attachment: { name: string; url: string }) => {
+                                                                if (attachment.name && attachment.name.trim() !== '') {
+                                                                    return attachment.name;
+                                                                }
+                                                                try {
+                                                                    const url = new URL(attachment.url);
+                                                                    const pathname = decodeURIComponent(url.pathname);
+                                                                    const parts = pathname.split('/');
+                                                                    const lastPart = parts[parts.length - 1];
+                                                                    if (lastPart.includes('_')) {
+                                                                        const nameParts = lastPart.split('_');
+                                                                        return nameParts.slice(1).join('_') || `ファイル${index + 1}`;
+                                                                    }
+                                                                    return lastPart || `ファイル${index + 1}`;
+                                                                } catch {
+                                                                    return `ファイル${index + 1}`;
+                                                                }
+                                                            };
+                                                            return (
+                                                                <a 
+                                                                    key={index} 
+                                                                    href={att.url} 
+                                                                    target="_blank" 
+                                                                    rel="noopener noreferrer"
+                                                                    download={getFileName(att)}
+                                                                    className="flex items-center gap-1 p-1.5 bg-white rounded hover:bg-gray-100 transition-colors text-xs text-primary"
+                                                                >
+                                                                    <Download size={12} />
+                                                                    <span className="truncate">{getFileName(att)}</span>
+                                                                </a>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                    
                                     <div className="flex flex-col gap-2">
                                         {(proposalId || contractId) && (
                                             <Link href={`/messages/${contractId || proposalId}`}>
