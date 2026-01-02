@@ -351,6 +351,11 @@ export default function MessageRoomPage() {
         const controller = new AbortController();
         const timeoutMs = 20000; // 20秒タイムアウト
         
+        // Cloud Run直接URLを使用（環境変数から取得、フォールバックは相対パス）
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+        const apiUrl = apiBaseUrl ? `${apiBaseUrl}/api/contracts/create` : '/api/contracts/create';
+        saveDebugLog("API URL determined", { apiBaseUrl, apiUrl });
+        
         // タイムアウト設定
         const timeoutId = setTimeout(() => {
             saveDebugLog("Request timeout triggered");
@@ -359,7 +364,7 @@ export default function MessageRoomPage() {
 
         try {
             // 方法1: 標準的なfetch（keepalive有効）
-            const fetchPromise = fetch('/api/contracts/create', {
+            const fetchPromise = fetch(apiUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -397,9 +402,9 @@ export default function MessageRoomPage() {
                         return;
                     }
                     
-                    saveDebugLog("Starting XHR fallback...");
+                    saveDebugLog("Starting XHR fallback...", { xhrUrl: apiUrl });
                     const xhr = new XMLHttpRequest();
-                    xhr.open('POST', '/api/contracts/create', true);
+                    xhr.open('POST', apiUrl, true);
                     xhr.setRequestHeader('Content-Type', 'application/json');
                     xhr.setRequestHeader('Authorization', `Bearer ${token}`);
                     xhr.setRequestHeader('X-Request-ID', `${Date.now()}-${attempt}-xhr`);
