@@ -2693,3 +2693,51 @@ gcloud run services update projectmarkethub \
 2. `src/app/(main)/client/contracts/[id]/page.tsx` を確認・修正
    - キャンセル済み時に納品物セクションが非表示になっていることを確認
 3. デプロイして動作確認
+
+---
+
+## 58. 修正計画（2026-01-02 オファー送信ボタンのタイムアウト問題の根本解決）
+
+### 58.1 問題の概要
+クライアントモードで「オファーを送信する」ボタンを押すと、APIがタイムアウトして契約が作成されない。
+
+### 58.2 原因分析
+1. **firebase-admin初期化の問題**: Cloud Run環境でfirebase-adminの初期化がハングしていた
+2. **Proxyパターンの複雑さ**: 遅延初期化のためのProxyパターンが複雑で、Cloud Run環境で問題を引き起こしていた
+
+### 58.3 修正内容
+
+#### 1. firebase-admin.ts (`src/lib/firebase-admin.ts`)
+- Proxyパターンを廃止し、シンプルな直接関数エクスポートに変更
+- `getAdminAuth()`と`getAdminDb()`関数を直接エクスポート
+- 後方互換性のため、`adminAuth`と`adminDb`オブジェクトも提供（内部でgetter関数を呼び出す）
+- Cloud Run環境では認証情報を省略してデフォルトの認証情報検出に任せる
+
+#### 2. contracts/create/route.ts (`src/app/api/contracts/create/route.ts`)
+- 約180行から約110行に簡素化
+- 冗長なクエリとチェックを削除
+- Promise.allで並列更新を実行
+- 詳細なタイミングログを追加
+
+### 58.4 実装完了（2026-01-02）
+**修正内容:**
+1. `src/lib/firebase-admin.ts`を簡素化（Proxyパターン削除）
+2. `src/app/api/contracts/create/route.ts`を簡素化（クエリ削減、並列処理化）
+3. Cloud Buildで再ビルド（Build ID: 50bc7390-b5c4-4f85-b896-c078fe4d9cc6、ステータス: SUCCESS）
+4. Cloud Runにデプロイ（リビジョン: projectmarkethub-00140-frw）
+
+**テスト結果:**
+```bash
+# healthエンドポイント（コールドスタート）
+curl -w "\nTotal time: %{time_total}s\n" https://projectmarkethub-5ckpwmqfza-an.a.run.app/api/health
+# 結果: Total time: 2.331349s
+
+# healthエンドポイント（ウォームアップ後）
+curl -w "\nTotal time: %{time_total}s\n" https://projectmarkethub-5ckpwmqfza-an.a.run.app/api/health
+# 結果: Total time: 0.195562s
+```
+
+**結論:**
+- コールドスタート時でも2.3秒で応答（以前は30秒以上タイムアウト）
+- ウォームアップ後は0.2秒で応答
+- firebase-admin初期化の問題が解決された

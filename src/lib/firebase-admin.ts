@@ -1,96 +1,63 @@
 import * as admin from 'firebase-admin';
 
-// Lazy initialization - only initialize when actually needed
-let initialized = false;
-let initializationError: Error | null = null;
+// シンプルな初期化 - モジュールロード時に一度だけ実行
+let app: admin.app.App | null = null;
 
-function initializeFirebaseAdmin(): void {
-    if (initialized) {
-        return;
+function getApp(): admin.app.App {
+    if (app) {
+        return app;
     }
     
     if (admin.apps.length > 0) {
-        initialized = true;
-        return;
+        app = admin.apps[0]!;
+        return app;
     }
     
-    if (initializationError) {
-        throw initializationError;
-    }
+    const projectId = process.env.FIREBASE_PROJECT_ID || 
+                      process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 
+                      'projectmarkethub-db904';
     
-    const startTime = Date.now();
-    console.log('[Firebase Admin] Starting initialization...');
+    console.log(`[Firebase Admin] Initializing with projectId: ${projectId}`);
     
-    const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'projectmarkethub-db904';
-    
-    console.log(`[Firebase Admin] projectId: ${projectId}, K_SERVICE: ${process.env.K_SERVICE || 'not set'}, GOOGLE_CLOUD_PROJECT: ${process.env.GOOGLE_CLOUD_PROJECT || 'not set'}`);
-
     try {
-        // Cloud Run環境では、サービスアカウントキーなしで初期化
-        // credentialを完全に省略し、デフォルトの認証情報検出に任せる
-        // これにより、Cloud Run環境ではサービスアカウントが自動的に使用される
-        console.log(`[Firebase Admin] [${Date.now() - startTime}ms] Calling initializeApp...`);
-        
-        admin.initializeApp({
+        // Cloud Run環境では認証情報は自動的に提供される
+        // credentialを省略してデフォルトの認証情報検出に任せる
+        app = admin.initializeApp({
             projectId: projectId,
         });
-        
-        console.log(`[Firebase Admin] [${Date.now() - startTime}ms] initializeApp completed`);
-        initialized = true;
-        console.log(`[Firebase Admin] [${Date.now() - startTime}ms] Initialized successfully`);
+        console.log('[Firebase Admin] Initialized successfully');
+        return app;
     } catch (error) {
-        console.error(`[Firebase Admin] [${Date.now() - startTime}ms] Initialization error:`, error);
-        initializationError = error as Error;
+        console.error('[Firebase Admin] Initialization error:', error);
         throw error;
     }
 }
 
-// アプリ起動時に初期化を試みる（モジュールロード時）
-// これにより、最初のAPIリクエスト時ではなく、コンテナ起動時に初期化される
-try {
-    console.log('[Firebase Admin] Attempting early initialization on module load...');
-    initializeFirebaseAdmin();
-    console.log('[Firebase Admin] Early initialization successful');
-} catch (error) {
-    console.error('[Firebase Admin] Early initialization failed, will retry on first use:', error);
+// 直接エクスポート - Proxyを使わずシンプルに
+export function getAdminAuth(): admin.auth.Auth {
+    return getApp().auth();
 }
 
-// Getter functions that ensure initialization before use
-export const getAdminAuth = () => {
-    initializeFirebaseAdmin();
-    return admin.auth();
+export function getAdminDb(): admin.firestore.Firestore {
+    return getApp().firestore();
+}
+
+// 後方互換性のためのエクスポート
+// 注意: これらはgetter関数を呼び出すため、使用時に初期化される
+export const adminAuth = {
+    verifyIdToken: (token: string) => getAdminAuth().verifyIdToken(token),
+    getUser: (uid: string) => getAdminAuth().getUser(uid),
+    createUser: (properties: admin.auth.CreateRequest) => getAdminAuth().createUser(properties),
+    updateUser: (uid: string, properties: admin.auth.UpdateRequest) => getAdminAuth().updateUser(uid, properties),
+    deleteUser: (uid: string) => getAdminAuth().deleteUser(uid),
 };
 
-export const getAdminDb = () => {
-    initializeFirebaseAdmin();
-    return admin.firestore();
+export const adminDb = {
+    collection: (path: string) => getAdminDb().collection(path),
+    doc: (path: string) => getAdminDb().doc(path),
+    batch: () => getAdminDb().batch(),
+    runTransaction: <T>(updateFunction: (transaction: admin.firestore.Transaction) => Promise<T>) => 
+        getAdminDb().runTransaction(updateFunction),
 };
-
-// For backward compatibility - these will trigger initialization on first access
-export const adminAuth = new Proxy({} as admin.auth.Auth, {
-    get(target, prop) {
-        initializeFirebaseAdmin();
-        const auth = admin.auth();
-        const value = (auth as any)[prop];
-        // メソッドの場合はバインドして返す
-        if (typeof value === 'function') {
-            return value.bind(auth);
-        }
-        return value;
-    }
-});
-
-export const adminDb = new Proxy({} as admin.firestore.Firestore, {
-    get(target, prop) {
-        initializeFirebaseAdmin();
-        const db = admin.firestore();
-        const value = (db as any)[prop];
-        // メソッドの場合はバインドして返す
-        if (typeof value === 'function') {
-            return value.bind(db);
-        }
-        return value;
-    }
-});
 
 export const FieldValue = admin.firestore.FieldValue;

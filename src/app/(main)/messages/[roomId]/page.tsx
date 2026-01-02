@@ -231,96 +231,228 @@ export default function MessageRoomPage() {
         }
     };
 
-    const executeCreateContract = async () => {
-        if (!proposal || !job || !user) return;
+    // デバッグログをlocalStorageに保存する関数
+    const saveDebugLog = (message: string, data?: any) => {
+        const timestamp = new Date().toISOString();
+        const logEntry = { timestamp, message, data };
+        console.log(`[Contract] ${message}`, data || '');
+        
+        try {
+            const existingLogs = JSON.parse(localStorage.getItem('contractDebugLogs') || '[]');
+            existingLogs.push(logEntry);
+            // 最新50件のみ保持
+            if (existingLogs.length > 50) existingLogs.shift();
+            localStorage.setItem('contractDebugLogs', JSON.stringify(existingLogs));
+        } catch (e) {
+            // localStorage エラーは無視
+        }
+    };
+
+    // 堅牢な契約作成関数（複数の送信方法を試行）
+    const executeCreateContract = async (retryCount = 0) => {
+        const MAX_RETRIES = 5; // 最大5回リトライ（合計6回試行）
+        
+        saveDebugLog(`executeCreateContract called`, { retryCount, hasProposal: !!proposal, hasJob: !!job, hasUser: !!user });
+        
+        if (!proposal || !job || !user) {
+            saveDebugLog("Missing required data", { proposal: !!proposal, job: !!job, user: !!user });
+            setErrorMessage("必要なデータが不足しています。ページを再読み込みしてください。");
+            return;
+        }
         
         setIsCreatingContract(true);
-        setErrorMessage(null);
-
-        // タイムアウト設定 (60秒 - Cloud Runのコールドスタート対応)
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000);
+        if (retryCount === 0) {
+            setErrorMessage(null);
+            localStorage.setItem('contractDebugLogs', '[]');
+        }
 
         try {
-            console.log("Starting contract creation...", {
+            saveDebugLog(`Starting attempt ${retryCount + 1}/${MAX_RETRIES + 1}`, { proposalId: proposal.id });
+
+            // 認証チェック
+            let currentUser = auth.currentUser;
+            if (!currentUser) {
+                saveDebugLog("currentUser is null, waiting...");
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                currentUser = auth.currentUser;
+                if (!currentUser) {
+                    throw new Error("ログインセッションが切れました。ページを再読み込みして再ログインしてください。");
+                }
+            }
+
+            // トークン取得（キャッシュを使用して高速化）
+            saveDebugLog("Getting ID token...");
+            const tokenStartTime = Date.now();
+            const token = await Promise.race([
+                currentUser.getIdToken(retryCount === 0), // 初回のみforceRefresh
+                new Promise<never>((_, reject) => 
+                    setTimeout(() => reject(new Error("Token timeout")), 10000)
+                )
+            ]);
+            saveDebugLog("Token obtained", { durationMs: Date.now() - tokenStartTime });
+
+            const requestBody = JSON.stringify({
                 proposalId: proposal.id,
                 jobId: job.id,
                 clientId: user.uid,
                 workerId: proposal.workerId,
                 price: proposal.price,
-                title: job.title
+                title: job.title,
             });
 
-            const token = await auth.currentUser?.getIdToken();
-            // Use Cloud Run direct URL to avoid domain mapping timeout issues
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
-            const res = await fetch(`${apiUrl}/api/contracts/create`, {
-                method: "POST",
-                headers: { 
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    proposalId: proposal.id,
-                    jobId: job.id,
-                    clientId: user.uid,
-                    workerId: proposal.workerId,
-                    price: proposal.price,
-                    title: job.title,
-                }),
-                signal: controller.signal
-            });
+            // 複数の送信方法を並行して試行（レース条件）
+            saveDebugLog("Sending request with multiple methods...");
             
-            clearTimeout(timeoutId);
-
-            if (!res.ok) {
-                const errorText = await res.text();
-                console.error("API Error Response:", res.status, errorText);
-                try {
-                    const errorJson = JSON.parse(errorText);
-                    throw new Error(errorJson.error || `Server error: ${res.status}`);
-                } catch (e) {
-                    throw new Error(`Server error: ${res.status}`);
-                }
-            }
-
-            const data = await res.json();
-            console.log("API Response:", data);
+            const result = await sendWithMultipleMethods(token, requestBody, retryCount);
             
-            if (data.error) {
-                console.error("Contract creation logic error:", data.error);
-                setErrorMessage(data.error);
-                setIsCreatingContract(false);
-                return;
-            }
-            
-            if (data.contractId) {
-                console.log("Contract created/found:", data.contractId, "isExisting:", data.isExisting);
-                // モーダルを閉じる
+            if (result.success && result.contractId) {
+                saveDebugLog("SUCCESS!", { contractId: result.contractId });
                 setIsConfirmModalOpen(false);
-                // 契約詳細ページへ遷移
-                console.log("Navigating to:", `/client/contracts/${data.contractId}`);
-                
-                // 遷移前に少し待機して、状態更新を確実にする
                 setTimeout(() => {
-                    // router.pushだと遷移しない場合があるため、window.location.hrefを使用
-                    window.location.href = `/client/contracts/${data.contractId}`;
-                }, 500);
+                    window.location.href = `/client/contracts/${result.contractId}`;
+                }, 300);
+                return;
             } else {
-                console.error("Unexpected response - no contractId:", data);
-                setErrorMessage("予期しないエラーが発生しました。もう一度お試しください。");
-                setIsCreatingContract(false);
+                throw new Error(result.error || "契約作成に失敗しました");
             }
         } catch (err: any) {
-            clearTimeout(timeoutId);
-            console.error("Execute contract error:", err);
+            saveDebugLog(`Error (attempt ${retryCount + 1}):`, { message: err.message, name: err.name });
             
-            if (err.name === 'AbortError') {
-                setErrorMessage("通信がタイムアウトしました。もう一度お試しください。");
+            // リトライ可能なエラーかチェック
+            const isRetryableError = 
+                err.name === 'AbortError' || 
+                err.message?.includes('fetch') ||
+                err.message?.includes('network') ||
+                err.message?.includes('timeout') ||
+                err.message?.includes('Failed') ||
+                err.message?.includes('タイムアウト');
+            
+            if (isRetryableError && retryCount < MAX_RETRIES) {
+                // 段階的バックオフ: 0.5秒, 1秒, 1.5秒, 2秒, 2.5秒, 3秒
+                const waitTime = 500 + (retryCount * 500);
+                saveDebugLog(`Auto-retrying in ${waitTime}ms...`);
+                setErrorMessage(`通信エラー。自動リトライ中... (${retryCount + 1}/${MAX_RETRIES})`);
+                
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+                return executeCreateContract(retryCount + 1);
+            }
+            
+            if (err.name === 'AbortError' || err.message?.includes('timeout')) {
+                setErrorMessage("通信がタイムアウトしました。ネットワーク接続を確認して「再試行」を押してください。");
             } else {
-                setErrorMessage(err.message || "エラーが発生しました。もう一度お試しください。");
+                setErrorMessage(err.message || "エラーが発生しました。「再試行」を押してください。");
             }
             setIsCreatingContract(false);
+        }
+    };
+
+    // 複数の送信方法を試行する関数
+    const sendWithMultipleMethods = async (token: string, body: string, attempt: number): Promise<{success: boolean, contractId?: string, error?: string}> => {
+        const controller = new AbortController();
+        const timeoutMs = 20000; // 20秒タイムアウト
+        
+        // タイムアウト設定
+        const timeoutId = setTimeout(() => {
+            saveDebugLog("Request timeout triggered");
+            controller.abort();
+        }, timeoutMs);
+
+        try {
+            // 方法1: 標準的なfetch（keepalive有効）
+            const fetchPromise = fetch('/api/contracts/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                    'X-Request-ID': `${Date.now()}-${attempt}`, // リクエスト追跡用
+                },
+                body: body,
+                signal: controller.signal,
+                keepalive: true, // 接続を維持
+            }).then(async (res) => {
+                if (!res.ok) {
+                    const errorText = await res.text();
+                    let errorMsg = `サーバーエラー (${res.status})`;
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        errorMsg = errorJson.error || errorMsg;
+                    } catch (e) {}
+                    return { success: false, error: errorMsg };
+                }
+                const data = await res.json();
+                if (data.contractId) {
+                    return { success: true, contractId: data.contractId };
+                }
+                return { success: false, error: data.error || "契約IDが返されませんでした" };
+            }).catch((err) => {
+                saveDebugLog("Fetch error:", { message: err.message });
+                return { success: false, error: err.message };
+            });
+
+            // 方法2: XMLHttpRequest（フォールバック）- 2秒後に開始
+            const xhrPromise = new Promise<{success: boolean, contractId?: string, error?: string}>((resolve) => {
+                setTimeout(() => {
+                    if (controller.signal.aborted) {
+                        resolve({ success: false, error: "Aborted" });
+                        return;
+                    }
+                    
+                    saveDebugLog("Starting XHR fallback...");
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', '/api/contracts/create', true);
+                    xhr.setRequestHeader('Content-Type', 'application/json');
+                    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                    xhr.setRequestHeader('X-Request-ID', `${Date.now()}-${attempt}-xhr`);
+                    xhr.timeout = timeoutMs - 2000;
+                    
+                    xhr.onload = () => {
+                        if (xhr.status >= 200 && xhr.status < 300) {
+                            try {
+                                const data = JSON.parse(xhr.responseText);
+                                if (data.contractId) {
+                                    resolve({ success: true, contractId: data.contractId });
+                                } else {
+                                    resolve({ success: false, error: data.error });
+                                }
+                            } catch (e) {
+                                resolve({ success: false, error: "Invalid response" });
+                            }
+                        } else {
+                            resolve({ success: false, error: `XHR Error: ${xhr.status}` });
+                        }
+                    };
+                    
+                    xhr.onerror = () => resolve({ success: false, error: "XHR network error" });
+                    xhr.ontimeout = () => resolve({ success: false, error: "XHR timeout" });
+                    xhr.send(body);
+                }, 2000);
+            });
+
+            // 最初に成功したものを返す
+            const result = await Promise.race([
+                fetchPromise,
+                xhrPromise,
+            ]);
+
+            clearTimeout(timeoutId);
+            
+            // 成功した場合はそのまま返す
+            if (result.success) {
+                return result;
+            }
+            
+            // 両方失敗した場合、もう少し待ってから結果を確認
+            const allResults = await Promise.allSettled([fetchPromise, xhrPromise]);
+            for (const r of allResults) {
+                if (r.status === 'fulfilled' && r.value.success) {
+                    return r.value;
+                }
+            }
+            
+            return result;
+        } catch (err: any) {
+            clearTimeout(timeoutId);
+            return { success: false, error: err.message };
         }
     };
 
@@ -832,44 +964,93 @@ export default function MessageRoomPage() {
             <Modal
                 isOpen={isConfirmModalOpen}
                 onClose={() => {
-                    setIsConfirmModalOpen(false);
-                    setErrorMessage(null);
+                    if (!isCreatingContract) {
+                        setIsConfirmModalOpen(false);
+                        setErrorMessage(null);
+                    }
                 }}
                 title="契約オファーの確認"
                 footer={
-                    <>
-                        <Button variant="ghost" onClick={() => {
-                            setIsConfirmModalOpen(false);
-                            setErrorMessage(null);
-                        }} disabled={isCreatingContract}>
+                    <div className="flex gap-2 w-full">
+                        <Button 
+                            variant="ghost" 
+                            onClick={() => {
+                                setIsConfirmModalOpen(false);
+                                setErrorMessage(null);
+                            }} 
+                            disabled={isCreatingContract}
+                            className="flex-1"
+                        >
                             キャンセル
                         </Button>
-                        <Button onClick={executeCreateContract} disabled={isCreatingContract} className="bg-accent hover:bg-accent/90 text-white">
-                            {isCreatingContract ? "送信中..." : "オファーを送信する"}
+                        <Button 
+                            onClick={() => executeCreateContract()} 
+                            disabled={isCreatingContract} 
+                            className={`flex-1 text-white ${errorMessage ? 'bg-orange-500 hover:bg-orange-600' : 'bg-accent hover:bg-accent/90'}`}
+                        >
+                            {isCreatingContract ? (
+                                <span className="flex items-center gap-2">
+                                    <span className="animate-spin">⏳</span>
+                                    送信中...
+                                </span>
+                            ) : errorMessage ? (
+                                "🔄 再試行する"
+                            ) : (
+                                "オファーを送信する"
+                            )}
                         </Button>
-                    </>
+                    </div>
                 }
             >
                 <div className="space-y-4">
                     {errorMessage && (
-                        <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm font-medium">
-                            {errorMessage}
+                        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg">
+                            <p className="font-bold text-sm mb-1">⚠️ エラーが発生しました</p>
+                            <p className="text-sm">{errorMessage}</p>
+                            <p className="text-xs mt-2 text-red-500">
+                                「再試行する」ボタンを押してください。
+                            </p>
+                            <button 
+                                className="text-xs text-blue-600 underline mt-2 block"
+                                onClick={() => {
+                                    try {
+                                        const logs = JSON.parse(localStorage.getItem('contractDebugLogs') || '[]');
+                                        console.log('=== Contract Debug Logs ===');
+                                        logs.forEach((log: any) => console.log(log));
+                                        alert('デバッグログをコンソールに出力しました。F12 → Console で確認してください。\n\nログ件数: ' + logs.length);
+                                    } catch (e) {
+                                        alert('ログの取得に失敗しました');
+                                    }
+                                }}
+                            >
+                                📋 デバッグログを表示
+                            </button>
                         </div>
                     )}
-                    <p className="text-gray-600">
-                        現在の条件で契約オファーを送信しますか？<br />
-                        ワーカーが合意すると契約が成立します。
-                    </p>
-                    <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                        <div className="flex justify-between text-sm">
-                            <span className="text-gray-500">契約金額 (税抜)</span>
-                            <span className="font-bold">{proposal.price.toLocaleString()}円</span>
+                    {!errorMessage && (
+                        <>
+                            <p className="text-gray-600">
+                                現在の条件で契約オファーを送信しますか？<br />
+                                ワーカーが合意すると契約が成立します。
+                            </p>
+                            <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-500">契約金額 (税抜)</span>
+                                    <span className="font-bold">{proposal.price.toLocaleString()}円</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-500">完了予定</span>
+                                    <span className="font-medium">{proposal.estimatedDuration}</span>
+                                </div>
+                            </div>
+                        </>
+                    )}
+                    {isCreatingContract && (
+                        <div className="bg-blue-50 border border-blue-200 text-blue-700 p-3 rounded-lg text-center">
+                            <p className="text-sm">サーバーと通信中です...</p>
+                            <p className="text-xs mt-1">15秒以内に完了します</p>
                         </div>
-                        <div className="flex justify-between text-sm">
-                            <span className="text-gray-500">完了予定</span>
-                            <span className="font-medium">{proposal.estimatedDuration}</span>
-                        </div>
-                    </div>
+                    )}
                 </div>
             </Modal>
         </div>
