@@ -9,12 +9,12 @@ export default function LawPage() {
                 <table className="w-full text-left border-collapse">
                     <tbody>
                         <tr className="border-b border-gray-100">
-                            <th className="py-4 px-6 bg-gray-50 font-semibold text-secondary w-1/3">販売事業者</th>
-                            <td className="py-4 px-6 text-text-body">山本健太</td>
-                        </tr>
-                        <tr className="border-b border-gray-100">
-                            <th className="py-4 px-6 bg-gray-50 font-semibold text-secondary">運営責任者</th>
-                            <td className="py-4 px-6 text-text-body">山本健太</td>
+                            <th className="py-4 px-6 bg-gray-50 font-semibold text-secondary">サイトURL</th>
+                            <td className="py-4 px-6 text-text-body">
+                                <a href="https://pj-markethub.com/" className="text-primary hover:underline">
+                                    https://pj-markethub.com/
+                                </a>
+                            </td>
                         </tr>
                         <tr className="border-b border-gray-100">
                             <th className="py-4 px-6 bg-gray-50 font-semibold text-secondary">所在地</th>
@@ -29,12 +29,12 @@ export default function LawPage() {
                             <td className="py-4 px-6 text-text-body">請求があった場合、遅滞なく開示します。</td>
                         </tr>
                         <tr className="border-b border-gray-100">
-                            <th className="py-4 px-6 bg-gray-50 font-semibold text-secondary">サイトURL</th>
-                            <td className="py-4 px-6 text-text-body">
-                                <a href="https://pj-markethub.com/" className="text-primary hover:underline">
-                                    https://pj-markethub.com/
-                                </a>
-                            </td>
+                            <th className="py-4 px-6 bg-gray-50 font-semibold text-secondary">販売事業者</th>
+                            <td className="py-4 px-6 text-text-body">山本健太</td>
+                        </tr>
+                        <tr className="border-b border-gray-100">
+                            <th className="py-4 px-6 bg-gray-50 font-semibold text-secondary">運営責任者</th>
+                            <td className="py-4 px-6 text-text-body">山本健太</td>
                         </tr>
                         <tr className="border-b border-gray-100">
                             <th className="py-4 px-6 bg-gray-50 font-semibold text-secondary">販売価格</th>
@@ -51,12 +51,7 @@ export default function LawPage() {
                         <tr className="border-b border-gray-100">
                             <th className="py-4 px-6 bg-gray-50 font-semibold text-secondary">支払時期</th>
                             <td className="py-4 px-6 text-text-body">
-                                <div className="space-y-2">
-                                    <p>契約締結時に決済処理を行い、役務提供完了まで支払いを留保します（収納代行）。</p>
-                                    <p><span className="font-semibold">固定報酬制:</span> 契約締結時に決済予約（与信確保）、検収完了時に決済確定。</p>
-                                    <p><span className="font-semibold">タスク方式:</span> 募集開始時に決済予約、承認完了時に決済確定。</p>
-                                    <p><span className="font-semibold">コンペ方式:</span> 募集開始時に決済予約、採用決定時に決済確定。</p>
-                                </div>
+                                契約締結時に決済予約（与信確保）を行い、検収完了時に決済確定します。
                             </td>
                         </tr>
                         <tr className="border-b border-gray-100">

@@ -19,8 +19,8 @@ const transporter = nodemailer.createTransport({
 const sendEmail = async (to: string, subject: string, text: string) => {
   if (!to) return;
   
-  const mailOptions = {
-    from: '"Project Market Hub" <no-reply@project-market-hub.com>',
+const mailOptions = {
+    from: '"Project Market Hub" <no-reply@pj-markethub.com>',
     to,
     subject,
     text,
@@ -40,7 +40,7 @@ const getUser = async (uid: string) => {
   return doc.exists ? doc.data() : null;
 };
 
-// 1. 募集期限切れチェック (Daily)
+// 1. 募集期限刁E��チェチE�� (Daily)
 export const checkExpiredJobs = functions.pubsub.schedule("every 24 hours").onRun(async (context) => {
   const now = admin.firestore.Timestamp.now();
   const jobsRef = db.collection("jobs");
@@ -65,7 +65,7 @@ export const checkExpiredJobs = functions.pubsub.schedule("every 24 hours").onRu
   return null;
 });
 
-// 2. 自動検収処理 (Daily)
+// 2. 自動検収処琁E(Daily)
 export const autoCompleteContracts = functions.pubsub.schedule("every 24 hours").onRun(async (context) => {
   const now = new Date();
   const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
@@ -97,8 +97,8 @@ export const autoCompleteContracts = functions.pubsub.schedule("every 24 hours")
       if (worker && worker.email && worker.notificationSettings?.emailContract !== false) {
         await sendEmail(
           worker.email,
-          "【Project Market Hub】自動検収のお知らせ",
-          `${contract.jobTitle} の検収が自動的に完了しました。報酬が支払われます。`
+          "【Project Market Hub】�E動検収のお知らせ",
+          `${contract.jobTitle} の検収が�E動的に完亁E��ました。報酬が支払われます。`
         );
       }
     } catch (error) {
@@ -108,7 +108,7 @@ export const autoCompleteContracts = functions.pubsub.schedule("every 24 hours")
   return null;
 });
 
-// 3. 未読メッセージ通知 (Every 15 mins)
+// 3. 未読メチE��ージ通知 (Every 15 mins)
 export const sendUnreadMessageNotifications = functions.pubsub.schedule("every 15 minutes").onRun(async (context) => {
   const now = new Date();
   const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
@@ -162,8 +162,8 @@ export const sendUnreadMessageNotifications = functions.pubsub.schedule("every 1
     if (user && user.email && user.notificationSettings?.emailMessage !== false) {
       await sendEmail(
         user.email,
-        "【Project Market Hub】新着メッセージがあります",
-        `あなたは ${msgs.length} 件の未読メッセージを受け取っています。\n\nサイトにログインして確認してください。\nhttps://project-market-hub.com/messages`
+        "【Project Market Hub】新着メチE��ージがありまぁE,
+        `あなた�E ${msgs.length} 件の未読メチE��ージを受け取ってぁE��す、En\nサイトにログインして確認してください、Enhttps://pj-markethub.com/messages`
       );
     }
   }
@@ -181,7 +181,7 @@ export const sendUnreadMessageNotifications = functions.pubsub.schedule("every 1
   return null;
 });
 
-// 4. 契約ステータス変更通知
+// 4. 契紁E��チE�Eタス変更通知
 export const onContractUpdate = functions.firestore
   .document("contracts/{contractId}")
   .onUpdate(async (change, context) => {
@@ -199,8 +199,8 @@ export const onContractUpdate = functions.firestore
       if (client && client.email && client.notificationSettings?.emailContract !== false) {
         await sendEmail(
           client.email,
-          "【Project Market Hub】契約が合意されました",
-          `${worker?.displayName || "ワーカー"} が案件「${newData.jobTitle}」の契約に合意しました。\n仮決済を行ってください。\n\nhttps://project-market-hub.com/client/contracts/${contractId}`
+          "【Project Market Hub】契紁E��合意されました",
+          `${worker?.displayName || "ワーカー"} が案件、E{newData.jobTitle}」�E契紁E��合意しました、En仮決済を行ってください、En\nhttps://pj-markethub.com/client/contracts/${contractId}`
         );
       }
     }
@@ -210,8 +210,8 @@ export const onContractUpdate = functions.firestore
       if (worker && worker.email && worker.notificationSettings?.emailContract !== false) {
         await sendEmail(
           worker.email,
-          "【Project Market Hub】仮決済が完了しました",
-          `案件「${newData.jobTitle}」の仮決済が完了しました。\n業務を開始してください。\n\nhttps://project-market-hub.com/worker/contracts/${contractId}`
+          "【Project Market Hub】仮決済が完亁E��ました",
+          `案件、E{newData.jobTitle}」�E仮決済が完亁E��ました、En業務を開始してください、En\nhttps://pj-markethub.com/worker/contracts/${contractId}`
         );
       }
     }
@@ -222,7 +222,7 @@ export const onContractUpdate = functions.firestore
         await sendEmail(
           client.email,
           "【Project Market Hub】納品報告がありました",
-          `${worker?.displayName || "ワーカー"} から案件「${newData.jobTitle}」の納品報告がありました。\n内容を確認し、検収を行ってください。\n\nhttps://project-market-hub.com/client/contracts/${contractId}`
+          `${worker?.displayName || "ワーカー"} から案件、E{newData.jobTitle}」�E納品報告がありました、En冁E��を確認し、検収を行ってください、En\nhttps://pj-markethub.com/client/contracts/${contractId}`
         );
       }
     }
@@ -232,8 +232,8 @@ export const onContractUpdate = functions.firestore
       if (worker && worker.email && worker.notificationSettings?.emailContract !== false) {
         await sendEmail(
           worker.email,
-          "【Project Market Hub】検収が完了しました",
-          `案件「${newData.jobTitle}」の検収が完了しました。\n報酬が支払われます。\n\nhttps://project-market-hub.com/worker/contracts/${contractId}`
+          "【Project Market Hub】検収が完亁E��ました",
+          `案件、E{newData.jobTitle}」�E検収が完亁E��ました、En報酬が支払われます、En\nhttps://pj-markethub.com/worker/contracts/${contractId}`
         );
       }
     }
@@ -253,16 +253,16 @@ export const onContractCreate = functions.firestore
       if (worker && worker.email && worker.notificationSettings?.emailContract !== false) {
         await sendEmail(
           worker.email,
-          "【Project Market Hub】契約オファーが届きました",
-          `${client?.displayName || "クライアント"} から案件「${data.jobTitle}」の契約オファーが届きました。\n内容を確認し、合意してください。\n\nhttps://project-market-hub.com/worker/contracts/${context.params.contractId}`
+          "【Project Market Hub】契紁E��ファーが届きました",
+          `${client?.displayName || "クライアンチE} から案件、E{data.jobTitle}」�E契紁E��ファーが届きました、En冁E��を確認し、合意してください、En\nhttps://pj-markethub.com/worker/contracts/${context.params.contractId}`
         );
       }
     }
     return null;
   });
 
-// 5. 完了プロジェクトの自動削除 (Daily)
-// 完了またはキャンセルから3か月経過した契約を削除
+// 5. 完亁E�Eロジェクト�E自動削除 (Daily)
+// 完亁E��た�Eキャンセルから3か月経過した契紁E��削除
 export const deleteOldCompletedContracts = functions.pubsub.schedule("every 24 hours").onRun(async (context) => {
   const now = new Date();
   const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
@@ -270,13 +270,13 @@ export const deleteOldCompletedContracts = functions.pubsub.schedule("every 24 h
 
   const contractsRef = db.collection("contracts");
   
-  // completedの契約
+  // completedの契紁E
   const completedSnapshot = await contractsRef
     .where("status", "==", "completed")
     .where("completedAt", "<", threeMonthsAgoTimestamp)
     .get();
 
-  // cancelledの契約
+  // cancelledの契紁E
   const cancelledSnapshot = await contractsRef
     .where("status", "==", "cancelled")
     .where("updatedAt", "<", threeMonthsAgoTimestamp)
@@ -307,11 +307,11 @@ export const deleteOldCompletedContracts = functions.pubsub.schedule("every 24 h
 export const notifyUpcomingDeletion = functions.pubsub.schedule("every 24 hours").onRun(async (context) => {
   const now = new Date();
   
-  // 2週間後に削除予定（76日前に完了した契約）
+  // 2週間後に削除予定！E6日前に完亁E��た契紁E��E
   const twoWeeksBeforeDeletion = new Date(now.getTime() - 76 * 24 * 60 * 60 * 1000);
   const twoWeeksBeforeStart = new Date(twoWeeksBeforeDeletion.getTime() - 24 * 60 * 60 * 1000);
   
-  // 1週間後に削除予定（83日前に完了した契約）
+  // 1週間後に削除予定！E3日前に完亁E��た契紁E��E
   const oneWeekBeforeDeletion = new Date(now.getTime() - 83 * 24 * 60 * 60 * 1000);
   const oneWeekBeforeStart = new Date(oneWeekBeforeDeletion.getTime() - 24 * 60 * 60 * 1000);
 
@@ -326,7 +326,7 @@ export const notifyUpcomingDeletion = functions.pubsub.schedule("every 24 hours"
 
   for (const doc of twoWeeksSnapshot.docs) {
     const contract = doc.data();
-    // 既に通知済みかチェック
+    // 既に通知済みかチェチE��
     if (contract.deletionNotified2Weeks) continue;
 
     const client = await getUser(contract.clientId);
@@ -336,8 +336,8 @@ export const notifyUpcomingDeletion = functions.pubsub.schedule("every 24 hours"
     if (client && client.email) {
       await sendEmail(
         client.email,
-        "【Project Market Hub】契約データ削除のお知らせ（2週間前）",
-        `案件「${contract.jobTitle}」の契約データは、完了から3か月後に自動削除されます。\n\n削除予定日: 約2週間後\n\n必要なデータ（納品物、メッセージ等）は、削除前にダウンロードして保存してください。\n\nhttps://project-market-hub.com/client/contracts/${doc.id}`
+        "【Project Market Hub】契紁E��ータ削除のお知らせ�E�E週間前�E�E,
+        `案件、E{contract.jobTitle}」�E契紁E��ータは、完亁E��めEか月後に自動削除されます、En\n削除予定日: 紁E週間後\n\n忁E��なチE�Eタ�E�納品物、メチE��ージ等）�E、削除前にダウンロードして保存してください、En\nhttps://pj-markethub.com/client/contracts/${doc.id}`
       );
     }
 
@@ -345,12 +345,12 @@ export const notifyUpcomingDeletion = functions.pubsub.schedule("every 24 hours"
     if (worker && worker.email) {
       await sendEmail(
         worker.email,
-        "【Project Market Hub】契約データ削除のお知らせ（2週間前）",
-        `案件「${contract.jobTitle}」の契約データは、完了から3か月後に自動削除されます。\n\n削除予定日: 約2週間後\n\n必要なデータ（納品物、メッセージ等）は、削除前にダウンロードして保存してください。\n\nhttps://project-market-hub.com/worker/contracts/${doc.id}`
+        "【Project Market Hub】契紁E��ータ削除のお知らせ�E�E週間前�E�E,
+        `案件、E{contract.jobTitle}」�E契紁E��ータは、完亁E��めEか月後に自動削除されます、En\n削除予定日: 紁E週間後\n\n忁E��なチE�Eタ�E�納品物、メチE��ージ等）�E、削除前にダウンロードして保存してください、En\nhttps://pj-markethub.com/worker/contracts/${doc.id}`
       );
     }
 
-    // 通知済みフラグを設定
+    // 通知済みフラグを設宁E
     await doc.ref.update({ deletionNotified2Weeks: true });
   }
 
@@ -363,7 +363,7 @@ export const notifyUpcomingDeletion = functions.pubsub.schedule("every 24 hours"
 
   for (const doc of oneWeekSnapshot.docs) {
     const contract = doc.data();
-    // 既に通知済みかチェック
+    // 既に通知済みかチェチE��
     if (contract.deletionNotified1Week) continue;
 
     const client = await getUser(contract.clientId);
@@ -373,8 +373,8 @@ export const notifyUpcomingDeletion = functions.pubsub.schedule("every 24 hours"
     if (client && client.email) {
       await sendEmail(
         client.email,
-        "【Project Market Hub】契約データ削除のお知らせ（1週間前）",
-        `【重要】案件「${contract.jobTitle}」の契約データは、まもなく自動削除されます。\n\n削除予定日: 約1週間後\n\n必要なデータ（納品物、メッセージ等）は、今すぐダウンロードして保存してください。\n\nhttps://project-market-hub.com/client/contracts/${doc.id}`
+        "【Project Market Hub】契紁E��ータ削除のお知らせ�E�E週間前�E�E,
+        `【重要】案件、E{contract.jobTitle}」�E契紁E��ータは、まもなく�E動削除されます、En\n削除予定日: 紁E週間後\n\n忁E��なチE�Eタ�E�納品物、メチE��ージ等）�E、今すぐダウンロードして保存してください、En\nhttps://pj-markethub.com/client/contracts/${doc.id}`
       );
     }
 
@@ -382,12 +382,12 @@ export const notifyUpcomingDeletion = functions.pubsub.schedule("every 24 hours"
     if (worker && worker.email) {
       await sendEmail(
         worker.email,
-        "【Project Market Hub】契約データ削除のお知らせ（1週間前）",
-        `【重要】案件「${contract.jobTitle}」の契約データは、まもなく自動削除されます。\n\n削除予定日: 約1週間後\n\n必要なデータ（納品物、メッセージ等）は、今すぐダウンロードして保存してください。\n\nhttps://project-market-hub.com/worker/contracts/${doc.id}`
+        "【Project Market Hub】契紁E��ータ削除のお知らせ�E�E週間前�E�E,
+        `【重要】案件、E{contract.jobTitle}」�E契紁E��ータは、まもなく�E動削除されます、En\n削除予定日: 紁E週間後\n\n忁E��なチE�Eタ�E�納品物、メチE��ージ等）�E、今すぐダウンロードして保存してください、En\nhttps://pj-markethub.com/worker/contracts/${doc.id}`
       );
     }
 
-    // 通知済みフラグを設定
+    // 通知済みフラグを設宁E
     await doc.ref.update({ deletionNotified1Week: true });
   }
 

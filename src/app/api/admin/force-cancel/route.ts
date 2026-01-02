@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, FieldValue } from "@/lib/firebase-admin";
-import { createRefund } from "@/lib/stripe";
+import { cancelOrRefundPaymentIntent } from "@/lib/stripe";
 
 // 管理者メールアドレス
 const ADMIN_EMAIL = "yamazarukyoto@gmail.com";
@@ -49,14 +49,13 @@ export async function POST(req: NextRequest) {
             }, { status: 400 });
         }
 
-        // 7. 返金処理（refund=trueかつ仮決済済みの場合）
-        let refundResult = null;
+        // 7. 返金/キャンセル処理（refund=trueかつPaymentIntentがある場合）
+        let cancelRefundResult: { action: 'cancelled' | 'refunded'; result: unknown } | null = null;
         if (refund && contract?.stripePaymentIntentId) {
             const paymentIntentId = contract.stripePaymentIntentId;
             try {
-                refundResult = await createRefund(
+                cancelRefundResult = await cancelOrRefundPaymentIntent(
                     paymentIntentId,
-                    undefined, // 全額返金
                     {
                         contractId: contractId,
                         reason: 'admin_force_cancellation',
@@ -64,18 +63,12 @@ export async function POST(req: NextRequest) {
                     }
                 );
                 
-                if (refundResult.status !== "succeeded" && refundResult.status !== "pending") {
-                    console.error("Refund failed:", refundResult);
-                    return NextResponse.json({ 
-                        error: "返金処理に失敗しました。Stripeダッシュボードで確認してください。",
-                        refundStatus: refundResult.status
-                    }, { status: 500 });
-                }
-            } catch (refundError) {
-                console.error("Refund error:", refundError);
+                console.log(`[Force Cancel] PaymentIntent ${paymentIntentId} ${cancelRefundResult.action}`);
+            } catch (cancelRefundError) {
+                console.error("Cancel/Refund error:", cancelRefundError);
                 return NextResponse.json({ 
-                    error: "返金処理中にエラーが発生しました。",
-                    details: refundError instanceof Error ? refundError.message : 'Unknown error'
+                    error: "返金/キャンセル処理中にエラーが発生しました。",
+                    details: cancelRefundError instanceof Error ? cancelRefundError.message : 'Unknown error'
                 }, { status: 500 });
             }
         }
@@ -89,8 +82,8 @@ export async function POST(req: NextRequest) {
             cancelApprovedAt: FieldValue.serverTimestamp(),
         };
 
-        if (refundResult) {
-            updateData.stripeRefundId = refundResult.id;
+        if (cancelRefundResult) {
+            updateData.stripePaymentAction = cancelRefundResult.action;
         }
 
         await contractRef.update(updateData);
@@ -109,15 +102,14 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        const message = refundResult 
-            ? "強制キャンセルと返金処理が完了しました。" 
+        const message = cancelRefundResult 
+            ? `強制キャンセルと${cancelRefundResult.action === 'refunded' ? '返金' : 'オーソリキャンセル'}処理が完了しました。` 
             : "強制キャンセルが完了しました。";
 
         return NextResponse.json({ 
             success: true, 
             message,
-            refunded: !!refundResult,
-            refundId: refundResult?.id
+            paymentAction: cancelRefundResult?.action || null,
         });
 
     } catch (error: unknown) {

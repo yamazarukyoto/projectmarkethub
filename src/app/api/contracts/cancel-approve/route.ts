@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, FieldValue } from "@/lib/firebase-admin";
-import { createRefund } from "@/lib/stripe";
+import { cancelOrRefundPaymentIntent } from "@/lib/stripe";
 
 export async function POST(req: NextRequest) {
     try {
@@ -47,36 +47,54 @@ export async function POST(req: NextRequest) {
         }
 
         // 7. ステータスチェック（キャンセル可能なステータスか）
-        const cancellableStatuses = ['pending_signature', 'waiting_for_escrow', 'escrow', 'in_progress'];
+        // submitted（納品確認待ち）も双方合意があればキャンセル可能
+        const cancellableStatuses = ['pending_signature', 'waiting_for_escrow', 'escrow', 'in_progress', 'submitted'];
         if (!cancellableStatuses.includes(contract?.status)) {
             return NextResponse.json({ 
-                error: `このステータス（${contract?.status}）ではキャンセルできません。` 
+                error: `このステータス（${contract?.status}）ではキャンセルできません。検収完了後のキャンセルは運営にお問い合わせください。` 
             }, { status: 400 });
         }
 
-        // 8. 仮決済済みの場合は返金処理
-        let refundResult = null;
-        if (contract?.status === 'escrow' || contract?.status === 'in_progress') {
+        // 8. 仮決済済みの場合は返金処理（escrow, in_progress, submittedが対象）
+        let cancelResult = null;
+        if (contract?.status === 'escrow' || contract?.status === 'in_progress' || contract?.status === 'submitted') {
             const paymentIntentId = contract?.stripePaymentIntentId;
             if (paymentIntentId) {
                 try {
-                    refundResult = await createRefund(
+                    // PaymentIntentの状態に応じてキャンセルまたは返金を実行
+                    // requires_capture（キャプチャ前）→ cancel
+                    // succeeded（キャプチャ後）→ refund
+                    cancelResult = await cancelOrRefundPaymentIntent(
                         paymentIntentId,
-                        undefined, // 全額返金
                         {
                             contractId: contractId,
                             reason: 'mutual_agreement_cancellation'
                         }
                     );
                     
-                    if (refundResult.status !== "succeeded" && refundResult.status !== "pending") {
-                        console.error("Refund failed:", refundResult);
-                        return NextResponse.json({ 
-                            error: "返金処理に失敗しました。運営にお問い合わせください。" 
-                        }, { status: 500 });
+                    console.log(`[cancel-approve] PaymentIntent処理完了: action=${cancelResult.action}, id=${cancelResult.result.id}`);
+                    
+                    // 結果の検証
+                    const resultStatus = cancelResult.result.status;
+                    if (cancelResult.action === 'cancelled') {
+                        // キャンセルの場合、statusは'canceled'であるべき
+                        if (resultStatus !== 'canceled') {
+                            console.error("Cancel failed:", cancelResult);
+                            return NextResponse.json({ 
+                                error: "決済キャンセル処理に失敗しました。運営にお問い合わせください。" 
+                            }, { status: 500 });
+                        }
+                    } else if (cancelResult.action === 'refunded') {
+                        // 返金の場合、statusは'succeeded'または'pending'であるべき
+                        if (resultStatus !== 'succeeded' && resultStatus !== 'pending') {
+                            console.error("Refund failed:", cancelResult);
+                            return NextResponse.json({ 
+                                error: "返金処理に失敗しました。運営にお問い合わせください。" 
+                            }, { status: 500 });
+                        }
                     }
-                } catch (refundError) {
-                    console.error("Refund error:", refundError);
+                } catch (cancelError) {
+                    console.error("Cancel/Refund error:", cancelError);
                     return NextResponse.json({ 
                         error: "返金処理中にエラーが発生しました。運営にお問い合わせください。" 
                     }, { status: 500 });
@@ -92,8 +110,14 @@ export async function POST(req: NextRequest) {
             cancelledAt: FieldValue.serverTimestamp(),
         };
 
-        if (refundResult) {
-            updateData.stripeRefundId = refundResult.id;
+        if (cancelResult) {
+            // キャンセルの場合はPaymentIntentのID、返金の場合はRefundのIDを保存
+            if (cancelResult.action === 'refunded') {
+                updateData.stripeRefundId = cancelResult.result.id;
+            } else {
+                updateData.stripeCancelledPaymentIntentId = cancelResult.result.id;
+            }
+            updateData.paymentAction = cancelResult.action;
         }
 
         await contractRef.update(updateData);
@@ -101,14 +125,14 @@ export async function POST(req: NextRequest) {
         // 10. 通知（将来的にはメール通知も追加）
         // TODO: 通知機能が実装されたら追加
 
-        const message = refundResult 
+        const message = cancelResult 
             ? "キャンセルが成立しました。返金処理が開始されました。" 
             : "キャンセルが成立しました。";
 
         return NextResponse.json({ 
             success: true, 
             message,
-            refunded: !!refundResult
+            refunded: !!cancelResult
         });
 
     } catch (error: unknown) {

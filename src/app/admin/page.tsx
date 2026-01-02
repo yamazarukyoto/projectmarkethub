@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { RefreshCw, Ban, AlertTriangle } from "lucide-react";
 
-const ADMIN_EMAIL = "yamazarukyoto@gmail.com";
+const ADMIN_EMAILS = ["yamazarukyoto@gmail.com", "service@pj-markethub.com"];
 
 export default function AdminDashboard() {
   const { user, loading: authLoading } = useAuth();
@@ -21,14 +21,16 @@ export default function AdminDashboard() {
   const [cancelReason, setCancelReason] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  useEffect(() => {
-    if (!authLoading && (!user || user.email !== ADMIN_EMAIL)) {
-      router.replace(user ? "/" : "/login?redirect=/admin");
-    }
-  }, [user, authLoading, router]);
+  const isAdmin = user?.email && ADMIN_EMAILS.includes(user.email);
 
   useEffect(() => {
-    if (authLoading || !user || user.email !== ADMIN_EMAIL) return;
+    if (!authLoading && (!user || !isAdmin)) {
+      router.replace(user ? "/" : "/login?redirect=/admin");
+    }
+  }, [user, authLoading, router, isAdmin]);
+
+  useEffect(() => {
+    if (authLoading || !user || !isAdmin) return;
 
     const fetchContracts = async () => {
       try {
@@ -75,8 +77,9 @@ export default function AdminDashboard() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 60000);
 
-      // 同じドメインのAPIを使用（CORSを回避）
-      const res = await fetch(`/api/admin/force-cancel`, {
+      // Cloud Run直接URL経由でAPIを呼び出し（タイムアウト回避）
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      const res = await fetch(`${apiUrl}/api/admin/force-cancel`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -110,7 +113,7 @@ export default function AdminDashboard() {
     }
   };
 
-  if (authLoading || !user || user.email !== ADMIN_EMAIL) {
+  if (authLoading || !user || !isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>

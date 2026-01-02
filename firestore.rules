@@ -11,7 +11,10 @@ service cloud.firestore {
     }
     
     function isAdmin() {
-      return request.auth != null && request.auth.token.email == "yamazarukyoto@gmail.com";
+      return request.auth != null && (
+        request.auth.token.email == "yamazarukyoto@gmail.com" ||
+        request.auth.token.email == "service@pj-markethub.com"
+      );
     }
 
     // Users collection

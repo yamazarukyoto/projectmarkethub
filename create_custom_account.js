@@ -21,7 +21,7 @@ async function createCustomAccount() {
             },
             business_type: 'individual',
             business_profile: {
-                url: 'https://project-market-hub.com',
+                url: 'https://pj-markethub.com',
                 mcc: '5734',
                 product_description: 'Software development services',
             },
@@ -41,7 +41,7 @@ async function createCustomAccount() {
                 first_name: 'Kenta',
                 last_name: 'Yamamoto',
                 first_name_kana: 'ケンタ',
-                last_name_kana: 'ヤマモト',
+                last_name_kana: 'ヤマモチE,
                 first_name_kanji: '健太',
                 last_name_kanji: '山本',
                 dob: {
@@ -58,8 +58,8 @@ async function createCustomAccount() {
                     country: 'JP',
                 },
                 address_kana: {
-                    line1: '１－１－１',
-                    line2: 'テストビル',
+                    line1: '�E�－１－！E,
+                    line2: 'チE��トビル',
                     city: 'ミナトク',
                     state: 'トウキョウ',
                     postal_code: '100-0001',
@@ -67,7 +67,7 @@ async function createCustomAccount() {
                 },
                 address_kanji: {
                     line1: '1-1-1',
-                    line2: 'テストビル',
+                    line2: 'チE��トビル',
                     city: '港区',
                     state: '東京都',
                     postal_code: '100-0001',
@@ -110,3 +110,4 @@ async function createCustomAccount() {
 }
 
 createCustomAccount();
+

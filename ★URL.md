@@ -1,29 +1,30 @@
 # Project Market Hub URLs
 
-## 本番URL（カスタムドメイン）
-https://project-market-hub.com/
+## 本番URL�E�カスタムドメイン�E�E
+https://pj-markethub.com/
 
-**注意**: カスタムドメインを使用するには、ドメインプロバイダーで以下のDNSレコードを設定する必要があります：
+**注愁E*: カスタムドメインを使用するには、ドメインプロバイダーで以下�EDNSレコードを設定する忁E��があります！E
 
-### Aレコード（IPv4）
+### Aレコード！EPv4�E�E
 - 216.239.32.21
 - 216.239.34.21
 - 216.239.36.21
 - 216.239.38.21
 
-### AAAAレコード（IPv6）
+### AAAAレコード！EPv6�E�E
 - 2001:4860:4802:32::15
 - 2001:4860:4802:34::15
 - 2001:4860:4802:36::15
 - 2001:4860:4802:38::15
 
-## 代替URL（DNSが設定されるまで使用可能）
+## 代替URL�E�ENSが設定されるまで使用可能�E�E
 - **Cloud Run**: https://projectmarkethub-5ckpwmqfza-an.a.run.app
-- **Cloud Run (新形式)**: https://projectmarkethub-173689610587.asia-northeast1.run.app
+- **Cloud Run (新形弁E**: https://projectmarkethub-173689610587.asia-northeast1.run.app
 - **Firebase Hosting**: https://projectmarkethub-db904.web.app
 
-**注意**: Cloud Runには2つのURLがあります。どちらも同じサービスを指しています。
+**注愁E*: Cloud Runには2つのURLがあります。どちらも同じサービスを指してぁE��す、E
 
 ## プロジェクト情報
-- **GCPプロジェクトID**: `projectmarkethub-db904`
+- **GCPプロジェクチED**: `projectmarkethub-db904`
 - **リージョン**: `asia-northeast1`
+

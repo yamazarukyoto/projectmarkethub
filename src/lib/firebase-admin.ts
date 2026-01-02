@@ -2,29 +2,33 @@ import * as admin from 'firebase-admin';
 
 // Lazy initialization - only initialize when actually needed
 let initialized = false;
+let initPromise: Promise<void> | null = null;
 
 function initializeFirebaseAdmin(): void {
     if (initialized || admin.apps.length > 0) {
         return;
     }
     
+    const startTime = Date.now();
     console.log('[Firebase Admin] Starting initialization...');
     
     const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'projectmarkethub-db904';
     
-    console.log(`[Firebase Admin] projectId: ${projectId}, K_SERVICE: ${process.env.K_SERVICE || 'not set'}`);
+    console.log(`[Firebase Admin] projectId: ${projectId}, K_SERVICE: ${process.env.K_SERVICE || 'not set'}, GOOGLE_CLOUD_PROJECT: ${process.env.GOOGLE_CLOUD_PROJECT || 'not set'}`);
 
     try {
         // Cloud Run環境では、サービスアカウントキーなしで初期化
-        // applicationDefault()は内部でメタデータサーバーにアクセスするため、
-        // 代わりにcredentialを省略してデフォルトの動作に任せる
+        // credentialを完全に省略し、デフォルトの認証情報検出に任せる
+        // これにより、Cloud Run環境ではサービスアカウントが自動的に使用される
+        console.log(`[Firebase Admin] [${Date.now() - startTime}ms] Calling initializeApp...`);
         admin.initializeApp({
             projectId: projectId,
         });
+        console.log(`[Firebase Admin] [${Date.now() - startTime}ms] initializeApp completed`);
         initialized = true;
-        console.log('[Firebase Admin] Initialized successfully');
+        console.log(`[Firebase Admin] [${Date.now() - startTime}ms] Initialized successfully`);
     } catch (error) {
-        console.error('[Firebase Admin] Initialization error:', error);
+        console.error(`[Firebase Admin] [${Date.now() - startTime}ms] Initialization error:`, error);
         throw error;
     }
 }
@@ -44,14 +48,26 @@ export const getAdminDb = () => {
 export const adminAuth = new Proxy({} as admin.auth.Auth, {
     get(target, prop) {
         initializeFirebaseAdmin();
-        return (admin.auth() as any)[prop];
+        const auth = admin.auth();
+        const value = (auth as any)[prop];
+        // メソッドの場合はバインドして返す
+        if (typeof value === 'function') {
+            return value.bind(auth);
+        }
+        return value;
     }
 });
 
 export const adminDb = new Proxy({} as admin.firestore.Firestore, {
     get(target, prop) {
         initializeFirebaseAdmin();
-        return (admin.firestore() as any)[prop];
+        const db = admin.firestore();
+        const value = (db as any)[prop];
+        // メソッドの場合はバインドして返す
+        if (typeof value === 'function') {
+            return value.bind(db);
+        }
+        return value;
     }
 });
 

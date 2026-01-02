@@ -546,16 +546,21 @@ export default function ClientContractDetailPage() {
                     )}
 
                     {/* キャンセル申請ボタン（キャンセル可能なステータスの場合） */}
-                    {['pending_signature', 'waiting_for_escrow', 'escrow', 'in_progress'].includes(contract.status) && 
+                    {['pending_signature', 'waiting_for_escrow', 'escrow', 'in_progress', 'submitted'].includes(contract.status) && 
                      !contract.cancelRequestedBy && (
                         <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                             <h4 className="font-bold text-gray-700 mb-2">契約のキャンセル</h4>
                             <p className="text-sm text-gray-600 mb-4">
                                 契約をキャンセルする場合は、下記ボタンからキャンセル申請を行ってください。
                                 ワーカーが承認すると契約がキャンセルされます。
-                                {(contract.status === 'escrow' || contract.status === 'in_progress') && (
+                                {(contract.status === 'escrow' || contract.status === 'in_progress' || contract.status === 'submitted') && (
                                     <span className="block mt-1 text-orange-600">
                                         ※仮決済済みのため、キャンセル時は全額返金されます。
+                                    </span>
+                                )}
+                                {contract.status === 'submitted' && (
+                                    <span className="block mt-1 text-red-600 font-medium">
+                                        ⚠️ 納品物を受け取った後のキャンセルです。ワーカーとよく話し合った上でキャンセルしてください。
                                     </span>
                                 )}
                             </p>

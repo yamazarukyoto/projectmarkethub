@@ -32,10 +32,11 @@ export async function POST(req: NextRequest) {
         }
 
         // 5. ステータスチェック（キャンセル可能なステータスか）
-        const cancellableStatuses = ['pending_signature', 'waiting_for_escrow', 'escrow', 'in_progress'];
+        // submitted（納品確認待ち）も双方合意があればキャンセル可能
+        const cancellableStatuses = ['pending_signature', 'waiting_for_escrow', 'escrow', 'in_progress', 'submitted'];
         if (!cancellableStatuses.includes(contract?.status)) {
             return NextResponse.json({ 
-                error: `このステータス（${contract?.status}）ではキャンセルできません。納品後のキャンセルは運営にお問い合わせください。` 
+                error: `このステータス（${contract?.status}）ではキャンセルできません。検収完了後のキャンセルは運営にお問い合わせください。` 
             }, { status: 400 });
         }
 

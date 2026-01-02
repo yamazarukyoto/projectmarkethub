@@ -60,6 +60,54 @@ export const createRefund = async (
     return await stripe.refunds.create(options);
 };
 
+// PaymentIntentの状態に応じてキャンセルまたは返金を実行
+export const cancelOrRefundPaymentIntent = async (
+    paymentIntentId: string,
+    metadata: Record<string, string> = {}
+): Promise<{ action: 'cancelled' | 'refunded'; result: Stripe.PaymentIntent | Stripe.Refund }> => {
+    // PaymentIntentの状態を取得
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    
+    console.log(`[cancelOrRefundPaymentIntent] PaymentIntent ${paymentIntentId} status: ${paymentIntent.status}`);
+    
+    // requires_capture: オーソリ済み・キャプチャ前 → キャンセル
+    if (paymentIntent.status === 'requires_capture') {
+        console.log(`[cancelOrRefundPaymentIntent] Cancelling PaymentIntent (requires_capture)`);
+        const cancelled = await stripe.paymentIntents.cancel(paymentIntentId, {
+            cancellation_reason: 'requested_by_customer',
+        });
+        return { action: 'cancelled', result: cancelled };
+    }
+    
+    // succeeded: キャプチャ済み → 返金
+    if (paymentIntent.status === 'succeeded') {
+        console.log(`[cancelOrRefundPaymentIntent] Refunding PaymentIntent (succeeded)`);
+        const refund = await stripe.refunds.create({
+            payment_intent: paymentIntentId,
+            metadata,
+        });
+        return { action: 'refunded', result: refund };
+    }
+    
+    // requires_payment_method, requires_confirmation, requires_action: まだ決済されていない → キャンセル
+    if (['requires_payment_method', 'requires_confirmation', 'requires_action', 'processing'].includes(paymentIntent.status)) {
+        console.log(`[cancelOrRefundPaymentIntent] Cancelling PaymentIntent (${paymentIntent.status})`);
+        const cancelled = await stripe.paymentIntents.cancel(paymentIntentId, {
+            cancellation_reason: 'requested_by_customer',
+        });
+        return { action: 'cancelled', result: cancelled };
+    }
+    
+    // canceled: 既にキャンセル済み
+    if (paymentIntent.status === 'canceled') {
+        console.log(`[cancelOrRefundPaymentIntent] PaymentIntent already cancelled`);
+        return { action: 'cancelled', result: paymentIntent };
+    }
+    
+    // その他の状態（想定外）
+    throw new Error(`Unexpected PaymentIntent status: ${paymentIntent.status}`);
+};
+
 export const createConnectAccount = async (
     email: string
 ): Promise<Stripe.Account> => {

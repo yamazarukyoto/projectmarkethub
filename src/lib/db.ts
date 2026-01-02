@@ -106,7 +106,7 @@ export const submitReview = async (
     const token = await auth.currentUser?.getIdToken();
     if (!token) throw new Error("Not authenticated");
 
-    // Use Cloud Run direct URL to bypass domain mapping timeout
+    // Use Cloud Run direct URL to avoid domain mapping timeout issues
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
     const res = await fetch(`${apiUrl}/api/reviews/create`, {
         method: "POST",
