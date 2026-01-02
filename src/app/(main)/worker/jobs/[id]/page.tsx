@@ -221,35 +221,45 @@ export default function WorkerJobDetailPage() {
                                             // ファイル名が空の場合、URLからファイル名を抽出
                                             const getFileNameFromUrl = (url: string, fallbackIndex: number) => {
                                                 try {
-                                                    const urlObj = new URL(url);
-                                                    let pathname = decodeURIComponent(urlObj.pathname);
+                                                    // Firebase Storage URL形式: 
+                                                    // https://firebasestorage.googleapis.com/v0/b/bucket/o/job-attachments%2F1234567890_filename.pdf?alt=media&token=xxx
                                                     
-                                                    // Firebase Storage URL形式: /v0/b/bucket/o/path%2Fto%2Ffile
-                                                    // /o/ 以降のパスを取得
-                                                    if (pathname.includes('/o/')) {
-                                                        pathname = pathname.split('/o/')[1] || pathname;
+                                                    // URLからパス部分を抽出（/o/以降、?より前）
+                                                    let encodedPath = '';
+                                                    if (url.includes('/o/')) {
+                                                        const afterO = url.split('/o/')[1];
+                                                        if (afterO) {
+                                                            encodedPath = afterO.split('?')[0];
+                                                        }
                                                     }
                                                     
+                                                    if (!encodedPath) {
+                                                        return `ファイル${fallbackIndex + 1}`;
+                                                    }
+                                                    
+                                                    // URLデコード（%2Fを/に変換など）
+                                                    const decodedPath = decodeURIComponent(encodedPath);
+                                                    
                                                     // パスの最後の部分を取得
-                                                    const parts = pathname.split('/');
+                                                    const parts = decodedPath.split('/');
                                                     let lastPart = parts[parts.length - 1];
                                                     
-                                                    // %2F がまだ残っている場合（二重エンコード）
-                                                    if (lastPart.includes('%2F')) {
-                                                        lastPart = decodeURIComponent(lastPart);
-                                                        const subParts = lastPart.split('/');
-                                                        lastPart = subParts[subParts.length - 1];
+                                                    if (!lastPart) {
+                                                        return `ファイル${fallbackIndex + 1}`;
                                                     }
                                                     
                                                     // Firebase Storageの場合、タイムスタンプ_ファイル名の形式
+                                                    // 例: 1234567890123_document.pdf
                                                     if (lastPart.includes('_')) {
-                                                        const nameParts = lastPart.split('_');
-                                                        // 最初の部分が数字（タイムスタンプ）の場合のみスキップ
-                                                        if (/^\d+$/.test(nameParts[0])) {
-                                                            return nameParts.slice(1).join('_') || `ファイル${fallbackIndex + 1}`;
+                                                        const underscoreIndex = lastPart.indexOf('_');
+                                                        const beforeUnderscore = lastPart.substring(0, underscoreIndex);
+                                                        // 最初の部分が13桁程度の数字（タイムスタンプ）の場合のみスキップ
+                                                        if (/^\d{10,15}$/.test(beforeUnderscore)) {
+                                                            const fileName = lastPart.substring(underscoreIndex + 1);
+                                                            return fileName || `ファイル${fallbackIndex + 1}`;
                                                         }
                                                     }
-                                                    return lastPart || `ファイル${fallbackIndex + 1}`;
+                                                    return lastPart;
                                                 } catch {
                                                     return `ファイル${fallbackIndex + 1}`;
                                                 }
