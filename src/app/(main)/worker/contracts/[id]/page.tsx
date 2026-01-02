@@ -511,7 +511,7 @@ export default function WorkerContractDetailPage() {
                     )}
 
                     {/* キャンセル申請ボタン（キャンセル可能なステータスの場合） */}
-                    {['pending_signature', 'waiting_for_escrow', 'escrow', 'in_progress'].includes(contract.status) && 
+                    {['pending_signature', 'waiting_for_escrow', 'escrow', 'in_progress', 'submitted'].includes(contract.status) && 
                      !contract.cancelRequestedBy && (
                         <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                             <h4 className="font-bold text-gray-700 mb-2">契約のキャンセル</h4>

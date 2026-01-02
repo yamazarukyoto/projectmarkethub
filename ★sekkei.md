@@ -2600,3 +2600,43 @@ gcloud run services update projectmarkethub \
 ### 54.5 注意事項
 - 最小インスタンス数を1に設定すると、常に1つのインスタンスが稼働するため、コストが増加する
 - 将来的には、firebase-adminの初期化を最適化して、コールドスタートでも高速に応答できるようにすることを検討
+
+---
+
+## 55. 修正計画（2026-01-02 検収時キャンセル承認不可・納品物表示制御）
+
+### 55.1 依頼内容
+1. **キャンセル承認ができない問題**: 検収時にクライアントがキャンセルした。ワーカーが承認したが、キャンセルできなかった。
+2. **キャンセル時の納品物表示制御**: キャンセル時に、クライアントが納品物を見れないようにしてほしい。
+
+### 55.2 原因分析
+
+#### ①キャンセル承認ができない問題
+コードを確認した結果、以下の問題を特定：
+- **cancel-approve API**: `submitted`ステータスは`cancellableStatuses`に含まれている（OK）
+- **cancel-request API**: `submitted`ステータスは`cancellableStatuses`に含まれている（OK）
+- **ワーカー側UI**: キャンセル申請ボタンの表示条件に`submitted`が含まれていない
+  - 現在: `['pending_signature', 'waiting_for_escrow', 'escrow', 'in_progress']`
+  - 修正後: `['pending_signature', 'waiting_for_escrow', 'escrow', 'in_progress', 'submitted']`
+
+#### ②キャンセル時の納品物表示制御
+- **クライアント側UI**: `cancelled`ステータス時は納品物セクションが表示されない（OK）
+- **ワーカー側UI**: `cancelled`ステータス時も納品物が表示される可能性がある
+- **Firebase Storage**: 直接URLアクセスは制限されていない（セキュリティルールで対応が必要だが、今回はUI側で対応）
+
+### 55.3 修正内容
+
+#### 1. ワーカー側契約詳細ページ (`src/app/(main)/worker/contracts/[id]/page.tsx`)
+- キャンセル申請ボタンの表示条件に`submitted`を追加
+- キャンセル済み時に納品物セクションを非表示にする
+
+#### 2. クライアント側契約詳細ページ (`src/app/(main)/client/contracts/[id]/page.tsx`)
+- キャンセル済み時に納品物セクションを非表示にする（既に対応済みだが確認）
+
+### 55.4 実装手順
+1. `src/app/(main)/worker/contracts/[id]/page.tsx` を修正
+   - キャンセル申請ボタンの表示条件に`submitted`を追加
+   - キャンセル済み時に納品物セクションを非表示にする
+2. `src/app/(main)/client/contracts/[id]/page.tsx` を確認・修正
+   - キャンセル済み時に納品物セクションが非表示になっていることを確認
+3. デプロイして動作確認
