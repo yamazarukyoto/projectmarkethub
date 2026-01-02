@@ -143,18 +143,43 @@ export default function ClientJobDetailPage() {
                                         <Paperclip size={16} /> 添付ファイル
                                     </h3>
                                     <div className="space-y-2">
-                                        {job.attachments.map((att, index) => (
-                                            <a 
-                                                key={index} 
-                                                href={att.url} 
-                                                target="_blank" 
-                                                rel="noopener noreferrer"
-                                                className="flex items-center gap-2 p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors text-sm text-primary"
-                                            >
-                                                <Download size={14} />
-                                                <span>{att.name}</span>
-                                            </a>
-                                        ))}
+                                        {job.attachments.map((att, index) => {
+                                            // ファイル名が空の場合、URLからファイル名を抽出
+                                            const getFileName = (attachment: { name: string; url: string }) => {
+                                                if (attachment.name && attachment.name.trim() !== '') {
+                                                    return attachment.name;
+                                                }
+                                                // URLからファイル名を抽出
+                                                try {
+                                                    const url = new URL(attachment.url);
+                                                    const pathname = decodeURIComponent(url.pathname);
+                                                    const parts = pathname.split('/');
+                                                    const lastPart = parts[parts.length - 1];
+                                                    // Firebase Storageの場合、タイムスタンプ_ファイル名の形式
+                                                    if (lastPart.includes('_')) {
+                                                        const nameParts = lastPart.split('_');
+                                                        return nameParts.slice(1).join('_') || `ファイル${index + 1}`;
+                                                    }
+                                                    return lastPart || `ファイル${index + 1}`;
+                                                } catch {
+                                                    return `ファイル${index + 1}`;
+                                                }
+                                            };
+                                            
+                                            return (
+                                                <a 
+                                                    key={index} 
+                                                    href={att.url} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer"
+                                                    download={getFileName(att)}
+                                                    className="flex items-center gap-2 p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors text-sm text-primary"
+                                                >
+                                                    <Download size={14} />
+                                                    <span className="truncate">{getFileName(att)}</span>
+                                                </a>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}
@@ -195,7 +220,50 @@ export default function ClientJobDetailPage() {
                                             <p className="text-sm font-medium">提案金額: {proposal.price.toLocaleString()}円</p>
                                             <p className="text-sm text-gray-500">完了予定: {proposal.estimatedDuration}</p>
                                         </div>
-                                        <p className="text-sm text-gray-700 line-clamp-3 mb-3">{proposal.message}</p>
+                                        <p className="text-sm text-gray-700 line-clamp-3 mb-3 whitespace-pre-wrap">{proposal.message}</p>
+                                        {/* 提案の添付ファイル */}
+                                        {proposal.attachments && proposal.attachments.length > 0 && (
+                                            <div className="mb-3">
+                                                <p className="text-xs text-gray-500 mb-1 flex items-center gap-1">
+                                                    <Paperclip size={12} /> 添付ファイル
+                                                </p>
+                                                <div className="space-y-1">
+                                                    {proposal.attachments.map((att, index) => {
+                                                        const getFileName = (attachment: { name: string; url: string }) => {
+                                                            if (attachment.name && attachment.name.trim() !== '') {
+                                                                return attachment.name;
+                                                            }
+                                                            try {
+                                                                const url = new URL(attachment.url);
+                                                                const pathname = decodeURIComponent(url.pathname);
+                                                                const parts = pathname.split('/');
+                                                                const lastPart = parts[parts.length - 1];
+                                                                if (lastPart.includes('_')) {
+                                                                    const nameParts = lastPart.split('_');
+                                                                    return nameParts.slice(1).join('_') || `ファイル${index + 1}`;
+                                                                }
+                                                                return lastPart || `ファイル${index + 1}`;
+                                                            } catch {
+                                                                return `ファイル${index + 1}`;
+                                                            }
+                                                        };
+                                                        return (
+                                                            <a 
+                                                                key={index} 
+                                                                href={att.url} 
+                                                                target="_blank" 
+                                                                rel="noopener noreferrer"
+                                                                download={getFileName(att)}
+                                                                className="flex items-center gap-1 p-1.5 bg-gray-50 rounded hover:bg-gray-100 transition-colors text-xs text-primary"
+                                                            >
+                                                                <Download size={12} />
+                                                                <span className="truncate">{getFileName(att)}</span>
+                                                            </a>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
                                         <div className="flex flex-col sm:flex-row gap-2">
                                             <Button 
                                                 size="sm" 
