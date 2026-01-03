@@ -2915,6 +2915,44 @@ curl -w "\nTotal time: %{time_total}s\n" -X POST "https://projectmarkethub-5ckpw
 
 ---
 
+## 64. 修正計画（2026-01-03 公開プロフィールの完了案件数・外部リンクアイコン修正）
+
+### 64.1 問題の概要
+1. **問題①**: 公開プロフィールの完了案件数が正確にカウントされていない。報酬ページでは正確にカウントされている。
+2. **問題②**: 公開プロフィールへのリンクに新しいタブを開くマーク（ExternalLinkアイコン）がついているが、実際には新しいタブを開かない。
+
+### 64.2 原因分析
+
+#### 問題①の原因
+- **公開プロフィールページ（`/users/[id]`）**: `(user as any).workerJobsCompleted || 0`を使用
+  - ユーザードキュメントに保存された静的な値を参照
+  - この値が更新されていないため、実際の完了契約数と一致しない
+- **報酬ページ（`/account/worker/payout`）**: Firestoreから直接クエリ
+  - `contracts`コレクションから`status === 'completed'`かつ`workerId === user.uid`の契約数をカウント
+  - 常に最新の正確な値を取得
+
+#### 問題②の原因
+- **account/layout.tsx**: `<ExternalLink size={18} />`アイコンを使用
+  - 実際には`<Link href={...}>`で同じタブ内で遷移
+  - アイコンが誤解を招く
+
+### 64.3 修正内容
+
+#### 1. 公開プロフィールページ（`src/app/(main)/users/[id]/page.tsx`）
+- 報酬ページと同様に、Firestoreから直接完了契約数をカウントする
+- `contracts`コレクションから`status === 'completed'`かつ`workerId === params.id`の契約数を取得
+
+#### 2. アカウント設定サイドバー（`src/app/(main)/account/layout.tsx`）
+- `ExternalLink`アイコンを`User`または`Eye`アイコンに変更
+- 新しいタブを開くわけではないので、適切なアイコンに変更
+
+### 64.4 実装手順
+1. `src/app/(main)/users/[id]/page.tsx` - 完了契約数をFirestoreから直接取得するように修正
+2. `src/app/(main)/account/layout.tsx` - ExternalLinkアイコンをUserアイコンに変更
+3. デプロイして動作確認
+
+---
+
 ## 61. APIコール設計思想（重要）
 
 ### 61.1 背景

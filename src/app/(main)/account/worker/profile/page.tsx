@@ -15,7 +15,7 @@ export default function WorkerProfilePage() {
     title: "",
     bio: "",
     skills: "",
-    hoursPerWeek: "10-20時間",
+    hoursPerWeek: "週10-20時間",
   });
 
   useEffect(() => {
@@ -25,7 +25,7 @@ export default function WorkerProfilePage() {
         title: user.workerProfile?.title || "",
         bio: user.workerProfile?.bio || "",
         skills: user.workerProfile?.skills?.join(", ") || "",
-        hoursPerWeek: user.workerProfile?.hoursPerWeek || "10-20時間",
+        hoursPerWeek: user.workerProfile?.hoursPerWeek || "週10-20時間",
       });
     }
   }, [user]);
@@ -120,9 +120,9 @@ export default function WorkerProfilePage() {
               onChange={(e) => setFormData({ ...formData, hoursPerWeek: e.target.value })}
             >
               <option value="週10時間未満">週10時間未満</option>
-              <option value="10-20時間">10-20時間</option>
-              <option value="20-30時間">20-30時間</option>
-              <option value="30時間以上">30時間以上</option>
+              <option value="週10-20時間">週10-20時間</option>
+              <option value="週20-30時間">週20-30時間</option>
+              <option value="週30時間以上">週30時間以上</option>
             </select>
           </div>
 

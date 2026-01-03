@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
-import { User, Shield, Briefcase, CreditCard, Lock, UserX, UserCircle, Wallet, ExternalLink } from "lucide-react";
+import { User, Shield, Briefcase, CreditCard, Lock, UserX, UserCircle, Wallet, Eye } from "lucide-react";
 import { useAuth } from "@/components/providers/AuthProvider";
 
 export default function AccountLayout({
@@ -85,7 +85,7 @@ export default function AccountLayout({
                                     href={`/users/${user.uid}`}
                                     className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-primary hover:bg-primary/10"
                                 >
-                                    <ExternalLink size={18} />
+                                    <Eye size={18} />
                                     公開プロフィールを見る
                                 </Link>
                             </div>
