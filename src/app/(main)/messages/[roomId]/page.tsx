@@ -267,6 +267,29 @@ export default function MessageRoomPage() {
         }
 
         try {
+            // リトライ時は既存の契約をチェック（APIがタイムアウトしても契約が作成されている可能性）
+            if (retryCount > 0) {
+                saveDebugLog(`Checking for existing contract before retry...`);
+                const expectedContractId = `contract_${proposal.id}`;
+                try {
+                    const existingContractSnap = await getDoc(doc(db, "contracts", expectedContractId));
+                    if (existingContractSnap.exists()) {
+                        const existingData = existingContractSnap.data();
+                        if (existingData?.status !== 'cancelled') {
+                            saveDebugLog(`Found existing contract: ${expectedContractId}, redirecting...`);
+                            setIsConfirmModalOpen(false);
+                            setTimeout(() => {
+                                window.location.href = `/client/contracts/${expectedContractId}`;
+                            }, 300);
+                            return;
+                        }
+                    }
+                } catch (checkErr: any) {
+                    saveDebugLog(`Error checking existing contract: ${checkErr.message}`);
+                    // チェックに失敗しても続行
+                }
+            }
+            
             saveDebugLog(`Starting attempt ${retryCount + 1}/${MAX_RETRIES + 1}`, { proposalId: proposal.id });
 
             // 認証チェック

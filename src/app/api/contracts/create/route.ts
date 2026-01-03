@@ -59,22 +59,27 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: corsHeaders });
         }
 
-        // 4. Check for existing contract (simple query - no composite index needed)
-        log("Checking existing contracts...");
-        const existingContracts = await adminDb.collection("contracts")
-            .where("proposalId", "==", proposalId)
-            .get();
+        // 4. 冪等性チェック: proposalIdをドキュメントIDとして使用
+        // これにより、同じproposalIdに対する並行リクエストでも重複作成を防止
+        const contractDocId = `contract_${proposalId}`;
+        const contractRef = adminDb.collection("contracts").doc(contractDocId);
         
-        // Filter out cancelled contracts in code
-        const activeContract = existingContracts.docs.find(doc => doc.data().status !== "cancelled");
-        if (activeContract) {
-            log(`Existing contract found: ${activeContract.id}`);
-            return NextResponse.json({
-                contractId: activeContract.id,
-                isExisting: true
-            }, { headers: corsHeaders });
+        log(`Checking existing contract with ID: ${contractDocId}`);
+        const existingDoc = await contractRef.get();
+        
+        if (existingDoc.exists) {
+            const existingData = existingDoc.data();
+            // キャンセル済みでない場合は既存の契約を返す
+            if (existingData?.status !== "cancelled") {
+                log(`Existing active contract found: ${contractDocId}`);
+                return NextResponse.json({
+                    contractId: contractDocId,
+                    isExisting: true
+                }, { headers: corsHeaders });
+            }
+            // キャンセル済みの場合は新しい契約を作成（上書き）
+            log("Existing contract is cancelled, creating new one");
         }
-        log("No existing contract");
 
         // 5. Get job info (minimal)
         log("Fetching job...");
@@ -86,12 +91,12 @@ export async function POST(req: Request) {
         const jobData = jobDoc.data();
         log("Job fetched");
 
-        // 6. Create contract
+        // 6. Create contract with fixed document ID (冪等性を保証)
         const platformFee = Math.floor(price * 0.05);
         const workerAmount = price - platformFee;
 
-        log("Creating contract...");
-        const contractRef = await adminDb.collection("contracts").add({
+        log(`Creating contract with ID: ${contractDocId}`);
+        await contractRef.set({
             jobId,
             proposalId,
             clientId,
@@ -107,7 +112,7 @@ export async function POST(req: Request) {
             stripePaymentIntentId: "",
             createdAt: FieldValue.serverTimestamp(),
         });
-        log(`Contract created: ${contractRef.id}`);
+        log(`Contract created: ${contractDocId}`);
 
         // 7. Update proposal and job (parallel)
         log("Updating proposal and job...");
@@ -118,7 +123,7 @@ export async function POST(req: Request) {
         log("Updates complete");
 
         log("Success");
-        return NextResponse.json({ contractId: contractRef.id }, { headers: corsHeaders });
+        return NextResponse.json({ contractId: contractDocId }, { headers: corsHeaders });
 
     } catch (error: any) {
         console.error("[Contract Create] Error:", error);
