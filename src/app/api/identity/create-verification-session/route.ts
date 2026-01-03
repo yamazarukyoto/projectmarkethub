@@ -2,11 +2,23 @@ import { NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { adminAuth } from "@/lib/firebase-admin";
 
+// CORSヘッダー
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+// OPTIONSリクエスト（プリフライト）対応
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 export async function POST(req: Request) {
     try {
         const authHeader = req.headers.get("Authorization");
         if (!authHeader?.startsWith("Bearer ")) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders });
         }
 
         const token = authHeader.split("Bearer ")[1];
@@ -14,7 +26,7 @@ export async function POST(req: Request) {
         const userId = decodedToken.uid;
 
         if (!userId) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders });
         }
 
         if (!process.env.NEXT_PUBLIC_BASE_URL) {
@@ -34,7 +46,7 @@ export async function POST(req: Request) {
 
             return NextResponse.json({ 
                 url: returnUrl 
-            });
+            }, { headers: corsHeaders });
         }
 
         // Create a Verification Session
@@ -51,14 +63,14 @@ export async function POST(req: Request) {
             return_url: returnUrl,
         });
 
-        return NextResponse.json({ url: verificationSession.url });
+        return NextResponse.json({ url: verificationSession.url }, { headers: corsHeaders });
     } catch (error: unknown) {
         console.error("Error creating verification session:", error);
         
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         return NextResponse.json(
             { error: "Internal Server Error", details: errorMessage },
-            { status: 500 }
+            { status: 500, headers: corsHeaders }
         );
     }
 }

@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     // 1. 認証チェック
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders });
     }
     const token = authHeader.split("Bearer ")[1];
     const decodedToken = await adminAuth.verifyIdToken(token);
@@ -29,26 +29,26 @@ export async function POST(req: NextRequest) {
     // 2. リクエストボディ取得
     const { contractId } = await req.json();
     if (!contractId) {
-      return NextResponse.json({ error: "Contract ID is required" }, { status: 400 });
+      return NextResponse.json({ error: "Contract ID is required" }, { status: 400, headers: corsHeaders });
     }
 
     // 3. 契約情報取得
     const contractRef = adminDb.collection("contracts").doc(contractId);
     const contractDoc = await contractRef.get();
     if (!contractDoc.exists) {
-      return NextResponse.json({ error: "Contract not found" }, { status: 404 });
+      return NextResponse.json({ error: "Contract not found" }, { status: 404, headers: corsHeaders });
     }
     const contract = contractDoc.data();
 
     // 4. 権限チェック (クライアント本人か)
     if (contract?.clientId !== userId) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: corsHeaders });
     }
 
     // 5. PaymentIntentID取得
     const paymentIntentId = contract?.stripePaymentIntentId;
     if (!paymentIntentId) {
-      return NextResponse.json({ error: "PaymentIntent ID not found in contract" }, { status: 400 });
+      return NextResponse.json({ error: "PaymentIntent ID not found in contract" }, { status: 400, headers: corsHeaders });
     }
 
     // デモモード判定
@@ -61,20 +61,20 @@ export async function POST(req: NextRequest) {
             stripeTransferId: "demo_transfer_id",
         });
 
-        return NextResponse.json({ success: true, skipped: true });
+        return NextResponse.json({ success: true, skipped: true }, { headers: corsHeaders });
     }
 
     // 6. ワーカー情報取得 (Stripe Account ID)
     const workerRef = adminDb.collection("users").doc(contract?.workerId);
     const workerDoc = await workerRef.get();
     if (!workerDoc.exists) {
-      return NextResponse.json({ error: "Worker not found" }, { status: 404 });
+      return NextResponse.json({ error: "Worker not found" }, { status: 404, headers: corsHeaders });
     }
     const worker = workerDoc.data();
     const workerStripeAccountId = worker?.stripeAccountId;
 
     if (!workerStripeAccountId) {
-      return NextResponse.json({ error: "Worker Stripe Account ID not found" }, { status: 400 });
+      return NextResponse.json({ error: "Worker Stripe Account ID not found" }, { status: 400, headers: corsHeaders });
     }
 
     // 7. 金額計算
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
     const paymentIntent = await capturePaymentIntent(paymentIntentId);
 
     if (paymentIntent.status !== "succeeded") {
-      return NextResponse.json({ error: "Failed to capture payment" }, { status: 500 });
+      return NextResponse.json({ error: "Failed to capture payment" }, { status: 500, headers: corsHeaders });
     }
 
     // 9. Transfer (報酬の引き渡し)
@@ -117,19 +117,14 @@ export async function POST(req: NextRequest) {
       completedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    return NextResponse.json({ success: true, paymentIntent, transfer });
+    return NextResponse.json({ success: true, paymentIntent, transfer }, { headers: corsHeaders });
 
   } catch (error: unknown) {
     console.error("Error completing contract:", error);
     
-    // エラー時もデモとして通す場合のフォールバック
-    // 注意: req.json() は一度しか読めないため、tryブロック内で取得した contractId を使用するべきだが、
-    // ここではスコープ外のため、本来は変数を外に出すべき。
-    // しかし、既存コードのロジックを尊重しつつ、安全に修正する。
-    
     // エラーメッセージの取得
     const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
 
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return NextResponse.json({ error: errorMessage }, { status: 500, headers: corsHeaders });
   }
 }

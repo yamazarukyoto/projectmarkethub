@@ -85,7 +85,7 @@ export interface Job {
     budget: number;
     deadline: Timestamp;
     
-    status: 'open' | 'closed' | 'filled' | 'cancelled';
+    status: 'open' | 'closed' | 'filled' | 'cancelled' | 'payment_expired';
 
     createdAt: Timestamp;
     updatedAt: Timestamp;
@@ -144,7 +144,8 @@ export interface Contract {
         | 'disputed'
         | 'completed'
         | 'cancelled'
-        | 'transfer_failed';
+        | 'transfer_failed'
+        | 'payment_expired';
 
     stripePaymentIntentId: string;
     stripeTransferId?: string;

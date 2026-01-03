@@ -115,6 +115,90 @@ export async function POST(req: Request) {
                 }
                 break;
             }
+            case "payment_intent.canceled": {
+                // 7日間の仮決済期限切れ、または手動キャンセル時に発火
+                const paymentIntent = event.data.object as import("stripe").Stripe.PaymentIntent;
+                const { jobId, contractId, type } = paymentIntent.metadata;
+                const cancellationReason = paymentIntent.cancellation_reason || "unknown";
+
+                console.log(`PaymentIntent canceled: ${paymentIntent.id}, reason: ${cancellationReason}`);
+
+                if (type === "escrow") {
+                    if (contractId) {
+                        // 契約のステータスを「期限切れキャンセル」に更新
+                        const contractRef = db.collection("contracts").doc(contractId);
+                        const contractDoc = await contractRef.get();
+                        
+                        if (contractDoc.exists) {
+                            const contractData = contractDoc.data();
+                            // escrow状態の契約のみ更新（既にcompleted等の場合は無視）
+                            if (contractData?.status === "escrow") {
+                                await contractRef.update({
+                                    status: "payment_expired",
+                                    paymentExpiredAt: admin.firestore.FieldValue.serverTimestamp(),
+                                    paymentExpiredReason: cancellationReason === "automatic" 
+                                        ? "7日間の仮決済期限が切れました" 
+                                        : `キャンセル理由: ${cancellationReason}`,
+                                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                                });
+                                console.log(`Contract ${contractId} marked as payment_expired due to PaymentIntent cancellation.`);
+                                
+                                // 通知を作成（クライアントとワーカー両方に）
+                                const notifications = [];
+                                if (contractData.clientId) {
+                                    notifications.push({
+                                        userId: contractData.clientId,
+                                        type: "payment_expired",
+                                        title: "仮決済の期限が切れました",
+                                        message: "7日間の仮決済期限が切れたため、契約がキャンセルされました。再度契約を行う場合は、新しい契約を作成してください。",
+                                        contractId: contractId,
+                                        read: false,
+                                        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                                    });
+                                }
+                                if (contractData.workerId) {
+                                    notifications.push({
+                                        userId: contractData.workerId,
+                                        type: "payment_expired",
+                                        title: "仮決済の期限が切れました",
+                                        message: "クライアントの仮決済期限が切れたため、契約がキャンセルされました。",
+                                        contractId: contractId,
+                                        read: false,
+                                        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                                    });
+                                }
+                                
+                                // バッチで通知を作成
+                                const batch = db.batch();
+                                for (const notification of notifications) {
+                                    const notifRef = db.collection("notifications").doc();
+                                    batch.set(notifRef, notification);
+                                }
+                                await batch.commit();
+                                console.log(`Notifications sent for expired contract ${contractId}`);
+                            }
+                        }
+                    } else if (jobId) {
+                        // タスク/コンペ形式の場合
+                        const jobRef = db.collection("jobs").doc(jobId);
+                        const jobDoc = await jobRef.get();
+                        
+                        if (jobDoc.exists) {
+                            const jobData = jobDoc.data();
+                            // open状態の仕事のみ更新
+                            if (jobData?.status === "open") {
+                                await jobRef.update({
+                                    status: "payment_expired",
+                                    paymentExpiredAt: admin.firestore.FieldValue.serverTimestamp(),
+                                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                                });
+                                console.log(`Job ${jobId} marked as payment_expired due to PaymentIntent cancellation.`);
+                            }
+                        }
+                    }
+                }
+                break;
+            }
             default:
                 console.log(`Unhandled event type ${event.type}`);
         }

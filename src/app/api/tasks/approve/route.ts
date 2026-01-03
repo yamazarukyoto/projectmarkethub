@@ -3,12 +3,24 @@ import { createTransfer } from "@/lib/stripe";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import * as admin from "firebase-admin";
 
+// CORSヘッダー
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+// OPTIONSリクエスト（プリフライト）対応
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 export async function POST(req: NextRequest) {
   try {
     // 1. 認証チェック
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders });
     }
     const token = authHeader.split("Bearer ")[1];
     const decodedToken = await adminAuth.verifyIdToken(token);
@@ -17,14 +29,14 @@ export async function POST(req: NextRequest) {
     // 2. リクエストボディ取得
     const { submissionId } = await req.json();
     if (!submissionId) {
-      return NextResponse.json({ error: "Submission ID is required" }, { status: 400 });
+      return NextResponse.json({ error: "Submission ID is required" }, { status: 400, headers: corsHeaders });
     }
 
     // 3. 提出情報取得
     const submissionRef = adminDb.collection("task_submissions").doc(submissionId);
     const submissionDoc = await submissionRef.get();
     if (!submissionDoc.exists) {
-      return NextResponse.json({ error: "Submission not found" }, { status: 404 });
+      return NextResponse.json({ error: "Submission not found" }, { status: 404, headers: corsHeaders });
     }
     const submission = submissionDoc.data();
 
@@ -32,31 +44,31 @@ export async function POST(req: NextRequest) {
     const jobRef = adminDb.collection("jobs").doc(submission?.jobId);
     const jobDoc = await jobRef.get();
     if (!jobDoc.exists) {
-      return NextResponse.json({ error: "Job not found" }, { status: 404 });
+      return NextResponse.json({ error: "Job not found" }, { status: 404, headers: corsHeaders });
     }
     const job = jobDoc.data();
 
     // 5. 権限チェック (クライアント本人か)
     if (job?.clientId !== userId) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: corsHeaders });
     }
 
     // 6. 既に承認済みかチェック
     if (submission?.status === 'approved') {
-        return NextResponse.json({ error: "Already approved" }, { status: 400 });
+        return NextResponse.json({ error: "Already approved" }, { status: 400, headers: corsHeaders });
     }
 
     // 7. ワーカー情報取得 (Stripe Account ID)
     const workerRef = adminDb.collection("users").doc(submission?.workerId);
     const workerDoc = await workerRef.get();
     if (!workerDoc.exists) {
-      return NextResponse.json({ error: "Worker not found" }, { status: 404 });
+      return NextResponse.json({ error: "Worker not found" }, { status: 404, headers: corsHeaders });
     }
     const worker = workerDoc.data();
     const workerStripeAccountId = worker?.stripeAccountId;
 
     if (!workerStripeAccountId) {
-      return NextResponse.json({ error: "Worker Stripe Account ID not found" }, { status: 400 });
+      return NextResponse.json({ error: "Worker Stripe Account ID not found" }, { status: 400, headers: corsHeaders });
     }
 
     // 8. 金額計算
@@ -81,7 +93,7 @@ export async function POST(req: NextRequest) {
             stripeTransferId: "demo_transfer_id",
         });
 
-        return NextResponse.json({ success: true, skipped: true });
+        return NextResponse.json({ success: true, skipped: true }, { headers: corsHeaders });
     }
 
     // 9. Transfer (報酬の引き渡し)
@@ -124,11 +136,11 @@ export async function POST(req: NextRequest) {
       reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    return NextResponse.json({ success: true, transfer });
+    return NextResponse.json({ success: true, transfer }, { headers: corsHeaders });
 
   } catch (error: unknown) {
     console.error("Error approving task:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return NextResponse.json({ error: errorMessage }, { status: 500, headers: corsHeaders });
   }
 }

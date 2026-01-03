@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     // 1. 認証チェック
     const authHeader = request.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders });
     }
     const token = authHeader.split("Bearer ")[1];
     const decodedToken = await adminAuth.verifyIdToken(token);
@@ -28,25 +28,25 @@ export async function POST(request: Request) {
     const { contractId, revieweeId, rating, comment, role } = body;
 
     if (!contractId || !revieweeId || !rating || !role) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400, headers: corsHeaders });
     }
 
     // 2. 契約の確認
     const contractRef = adminDb.collection("contracts").doc(contractId);
     const contractSnap = await contractRef.get();
     if (!contractSnap.exists) {
-      return NextResponse.json({ error: "Contract not found" }, { status: 404 });
+      return NextResponse.json({ error: "Contract not found" }, { status: 404, headers: corsHeaders });
     }
     const contractData = contractSnap.data();
 
     // 権限チェック: 評価者は契約の当事者である必要がある
     if (role === 'client') {
         if (contractData?.clientId !== reviewerId) {
-            return NextResponse.json({ error: "Not authorized to review as client" }, { status: 403 });
+            return NextResponse.json({ error: "Not authorized to review as client" }, { status: 403, headers: corsHeaders });
         }
     } else {
         if (contractData?.workerId !== reviewerId) {
-            return NextResponse.json({ error: "Not authorized to review as worker" }, { status: 403 });
+            return NextResponse.json({ error: "Not authorized to review as worker" }, { status: 403, headers: corsHeaders });
         }
     }
 
@@ -120,10 +120,10 @@ export async function POST(request: Request) {
       workerReviewCount: workerReviewCount
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true }, { headers: corsHeaders });
 
   } catch (error: any) {
     console.error("Error creating review:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500, headers: corsHeaders });
   }
 }
