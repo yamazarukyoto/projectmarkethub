@@ -4,14 +4,20 @@ import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import * as admin from "firebase-admin";
 
 export async function POST(req: NextRequest) {
+  console.log("[create-payment-intent] API called");
+  const startTime = Date.now();
+  
   try {
     // 1. 認証チェック
+    console.log("[create-payment-intent] Step 1: Auth check");
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const token = authHeader.split("Bearer ")[1];
+    console.log("[create-payment-intent] Step 1.1: Verifying token...");
     const decodedToken = await adminAuth.verifyIdToken(token);
+    console.log(`[create-payment-intent] Step 1.2: Token verified in ${Date.now() - startTime}ms`);
     const userId = decodedToken.uid;
 
     // 2. リクエストボディ取得
@@ -30,7 +36,9 @@ export async function POST(req: NextRequest) {
 
     if (contractId) {
         // --- プロジェクト方式（契約後の仮決済） ---
+        console.log(`[create-payment-intent] Step 2: Fetching contract ${contractId}...`);
         const contractDoc = await adminDb.collection("contracts").doc(contractId).get();
+        console.log(`[create-payment-intent] Step 2.1: Contract fetched in ${Date.now() - startTime}ms`);
         if (!contractDoc.exists) {
             return NextResponse.json({ error: "Contract not found" }, { status: 404 });
         }
