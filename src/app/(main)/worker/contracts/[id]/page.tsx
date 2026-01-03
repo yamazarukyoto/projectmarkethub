@@ -113,6 +113,7 @@ export default function WorkerContractDetailPage() {
                             contract.status === 'escrow' ? 'bg-cyan-100 text-cyan-800' :
                             contract.status === 'waiting_for_escrow' ? 'bg-yellow-100 text-yellow-800' :
                             contract.status === 'pending_signature' ? 'bg-orange-100 text-orange-800' :
+                            contract.status === 'payment_expired' ? 'bg-red-100 text-red-800' :
                             'bg-gray-100 text-gray-800'
                         }`}>
                             {contract.status === 'completed' ? '完了' :
@@ -120,7 +121,8 @@ export default function WorkerContractDetailPage() {
                              contract.status === 'in_progress' ? '業務進行中' :
                              contract.status === 'escrow' ? '仮決済済み' :
                              contract.status === 'waiting_for_escrow' ? '仮決済待ち' :
-                             contract.status === 'pending_signature' ? '契約合意待ち' : contract.status}
+                             contract.status === 'pending_signature' ? '契約合意待ち' :
+                             contract.status === 'payment_expired' ? '仮決済期限切れ' : contract.status}
                         </span>
                     </div>
                 </CardHeader>
@@ -435,6 +437,20 @@ export default function WorkerContractDetailPage() {
                                     キャンセル日時: {contract.cancelledAt.toDate().toLocaleString('ja-JP')}
                                 </p>
                             )}
+                        </div>
+                    )}
+
+                    {/* 仮決済期限切れ表示 */}
+                    {contract.status === 'payment_expired' && (
+                        <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+                            <h4 className="font-bold text-red-900 mb-2 flex items-center gap-2">
+                                <AlertCircle size={18} />
+                                仮決済の期限が切れました
+                            </h4>
+                            <p className="text-sm text-red-800">
+                                クライアントの仮決済が7日間の有効期限を過ぎたため、自動的にキャンセルされました。
+                                クライアントが再度仮払いを行うと、契約を再開できます。
+                            </p>
                         </div>
                     )}
 

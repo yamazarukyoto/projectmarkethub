@@ -188,7 +188,7 @@ export interface Review {
 export interface Notification {
     id: string;
     userId: string;
-    type: 'message' | 'contract' | 'payment' | 'system';
+    type: 'message' | 'contract' | 'payment' | 'payment_expired' | 'system';
     title: string;
     body: string;
     link?: string;
