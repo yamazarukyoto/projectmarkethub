@@ -2,6 +2,7 @@ import * as admin from 'firebase-admin';
 
 // シンプルな初期化 - モジュールロード時に一度だけ実行
 let app: admin.app.App | null = null;
+let firestoreInstance: admin.firestore.Firestore | null = null;
 
 function getApp(): admin.app.App {
     if (app) {
@@ -20,9 +21,9 @@ function getApp(): admin.app.App {
     console.log(`[Firebase Admin] Initializing with projectId: ${projectId}`);
     
     try {
-        // Cloud Run環境では認証情報は自動的に提供される
-        // credentialを省略してデフォルトの認証情報検出に任せる
+        // Cloud Run環境では applicationDefault() を明示的に使用
         app = admin.initializeApp({
+            credential: admin.credential.applicationDefault(),
             projectId: projectId,
         });
         console.log('[Firebase Admin] Initialized successfully');
@@ -39,7 +40,27 @@ export function getAdminAuth(): admin.auth.Auth {
 }
 
 export function getAdminDb(): admin.firestore.Firestore {
-    return getApp().firestore();
+    if (firestoreInstance) {
+        return firestoreInstance;
+    }
+    
+    const db = getApp().firestore();
+    
+    // Cloud Run環境でgRPCがハングする問題を回避するため、設定を調整
+    // preferRest: true を使用してREST APIを優先
+    try {
+        db.settings({
+            preferRest: true,  // gRPCの代わりにREST APIを使用
+            ignoreUndefinedProperties: true,
+        });
+        console.log('[Firebase Admin] Firestore settings applied (preferRest: true)');
+    } catch (e) {
+        // 既に設定済みの場合はエラーを無視
+        console.log('[Firebase Admin] Firestore settings already applied');
+    }
+    
+    firestoreInstance = db;
+    return firestoreInstance;
 }
 
 // 後方互換性のためのエクスポート
