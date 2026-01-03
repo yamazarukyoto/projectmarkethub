@@ -3052,6 +3052,55 @@ curl -w "\nTotal time: %{time_total}s\n" -X POST "https://projectmarkethub-5ckpw
 
 ---
 
+## 68. 修正計画（2026-01-03 オファー送信ボタンのタイムアウト問題の根本解決 - クライアントサイド直接書き込み）
+
+### 68.1 問題の概要
+クライアントモードで「オファーを送信する」ボタンを押すと、APIが504 Gateway Timeoutを返し、契約が作成されない。
+
+### 68.2 原因分析
+1. **Cloud Runログ**: `POST /api/contracts/create` が504 Gateway Timeoutを返している
+2. **healthエンドポイント**: 0.1秒で正常に応答
+3. **firebase-admin初期化の問題**: Cloud Run環境でfirebase-adminの初期化がハングしている
+4. **根本原因**: firebase-admin SDKがCloud Run環境で正しく認証情報を取得できていない可能性
+
+### 68.3 解決策: クライアントサイド直接書き込み
+
+**アプローチ**: サーバーサイドAPI（firebase-admin）を使用せず、クライアントサイドから直接Firestoreに書き込む
+
+**メリット**:
+- firebase-adminの初期化問題を完全に回避
+- レイテンシの削減（サーバーを経由しない）
+- シンプルな実装
+
+**セキュリティ対策**:
+- Firestoreセキュリティルールで適切な権限チェックを実装
+- クライアントIDの検証はセキュリティルールで行う
+
+### 68.4 修正内容
+
+#### 1. Firestoreセキュリティルール (`firestore.rules`)
+- `contracts`コレクションへの書き込みルールを追加
+- クライアントIDが認証ユーザーと一致することを確認
+- 必須フィールドの存在チェック
+
+#### 2. クライアント側 (`src/app/(main)/messages/[roomId]/page.tsx`)
+- `executeCreateContract`関数を修正
+- APIコールの代わりにFirestoreに直接書き込み
+- `setDoc`を使用して冪等性を保証
+
+#### 3. db.ts (`src/lib/db.ts`)
+- `createContract`関数を追加（クライアントサイド用）
+
+### 68.5 実装手順
+1. `firestore.rules` - contractsコレクションの書き込みルールを追加
+2. `src/lib/db.ts` - createContract関数を追加
+3. `src/app/(main)/messages/[roomId]/page.tsx` - クライアントサイド直接書き込みに変更
+4. Firestoreルールをデプロイ
+5. Cloud Runを再デプロイ
+6. 動作確認
+
+---
+
 ## 61. APIコール設計思想（重要）
 
 ### 61.1 背景

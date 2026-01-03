@@ -253,6 +253,89 @@ export const createContract = async (contract: Omit<Contract, "id">): Promise<st
     return docRef.id;
 };
 
+// クライアントサイドで直接契約を作成する関数（APIタイムアウト対策）
+export const createContractDirect = async (params: {
+    proposalId: string;
+    jobId: string;
+    clientId: string;
+    workerId: string;
+    price: number;
+    title: string;
+}): Promise<string> => {
+    const { proposalId, jobId, clientId, workerId, price, title } = params;
+    
+    // 冪等性のため、proposalIdベースの固定IDを使用
+    const contractId = `contract_${proposalId}`;
+    const contractRef = doc(db, "contracts", contractId);
+    
+    // 既存の契約をチェック
+    const existingSnap = await getDoc(contractRef);
+    if (existingSnap.exists()) {
+        const existingData = existingSnap.data();
+        if (existingData?.status !== 'cancelled') {
+            // 既に有効な契約が存在する場合はそのIDを返す
+            return contractId;
+        }
+    }
+    
+    // 金額計算
+    const TAX_RATE = 0.1;
+    const PLATFORM_FEE_RATE = 0.15;
+    const amount = price;
+    const tax = Math.floor(amount * TAX_RATE);
+    const totalAmount = amount + tax;
+    const platformFee = Math.floor(amount * PLATFORM_FEE_RATE);
+    const workerReceiveAmount = amount - platformFee;
+    
+    // 契約データを作成
+    const contractData: Omit<Contract, "id"> = {
+        jobId,
+        proposalId,
+        clientId,
+        workerId,
+        jobTitle: title,
+        jobType: 'project',
+        amount,
+        tax,
+        totalAmount,
+        platformFee,
+        workerReceiveAmount,
+        status: 'pending_signature',
+        stripePaymentIntentId: '', // 仮決済時に設定される
+        createdAt: Timestamp.now(),
+    };
+    
+    // バッチ書き込みで契約作成と提案ステータス更新を同時に行う
+    const batch = writeBatch(db);
+    
+    // 契約を作成
+    batch.set(contractRef, contractData);
+    
+    // 提案ステータスを更新
+    const proposalRef = doc(db, "proposals", proposalId);
+    batch.update(proposalRef, { status: 'hired' });
+    
+    // ジョブステータスを更新
+    const jobRef = doc(db, "jobs", jobId);
+    batch.update(jobRef, { status: 'filled' });
+    
+    // バッチをコミット
+    await batch.commit();
+    
+    // ワーカーに通知を送信
+    await createNotification({
+        userId: workerId,
+        type: 'contract',
+        title: '契約オファーが届きました',
+        body: `${title}の契約オファーが届きました。確認してください。`,
+        link: `/worker/contracts/${contractId}`,
+        read: false,
+        createdAt: Timestamp.now()
+    });
+    
+    return contractId;
+};
+
 export const getContracts = async (userId: string, userType: 'client' | 'worker'): Promise<Contract[]> => {
     const field = userType === 'client' ? 'clientId' : 'workerId';
     const q = query(collection(db, "contracts"), where(field, "==", userId), orderBy("createdAt", "desc"));

@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
-import { getJob, getProposal, addNegotiationMessage } from "@/lib/db";
+import { getJob, getProposal, addNegotiationMessage, createContractDirect } from "@/lib/db";
 import { Job, Proposal, Contract, User } from "@/types";
 import { doc, onSnapshot, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
@@ -248,11 +248,9 @@ export default function MessageRoomPage() {
         }
     };
 
-    // 堅牢な契約作成関数（複数の送信方法を試行）
-    const executeCreateContract = async (retryCount = 0) => {
-        const MAX_RETRIES = 5; // 最大5回リトライ（合計6回試行）
-        
-        saveDebugLog(`executeCreateContract called`, { retryCount, hasProposal: !!proposal, hasJob: !!job, hasUser: !!user });
+    // クライアントサイドで直接Firestoreに書き込む契約作成関数（APIタイムアウト対策）
+    const executeCreateContract = async () => {
+        saveDebugLog(`executeCreateContract called (Direct Firestore)`, { hasProposal: !!proposal, hasJob: !!job, hasUser: !!user });
         
         if (!proposal || !job || !user) {
             saveDebugLog("Missing required data", { proposal: !!proposal, job: !!job, user: !!user });
@@ -261,60 +259,20 @@ export default function MessageRoomPage() {
         }
         
         setIsCreatingContract(true);
-        if (retryCount === 0) {
-            setErrorMessage(null);
-            localStorage.setItem('contractDebugLogs', '[]');
-        }
+        setErrorMessage(null);
+        localStorage.setItem('contractDebugLogs', '[]');
 
         try {
-            // リトライ時は既存の契約をチェック（APIがタイムアウトしても契約が作成されている可能性）
-            if (retryCount > 0) {
-                saveDebugLog(`Checking for existing contract before retry...`);
-                const expectedContractId = `contract_${proposal.id}`;
-                try {
-                    const existingContractSnap = await getDoc(doc(db, "contracts", expectedContractId));
-                    if (existingContractSnap.exists()) {
-                        const existingData = existingContractSnap.data();
-                        if (existingData?.status !== 'cancelled') {
-                            saveDebugLog(`Found existing contract: ${expectedContractId}, redirecting...`);
-                            setIsConfirmModalOpen(false);
-                            setTimeout(() => {
-                                window.location.href = `/client/contracts/${expectedContractId}`;
-                            }, 300);
-                            return;
-                        }
-                    }
-                } catch (checkErr: any) {
-                    saveDebugLog(`Error checking existing contract: ${checkErr.message}`);
-                    // チェックに失敗しても続行
-                }
+            // 認証チェック
+            const currentUser = auth.currentUser;
+            if (!currentUser) {
+                throw new Error("ログインセッションが切れました。ページを再読み込みして再ログインしてください。");
             }
             
-            saveDebugLog(`Starting attempt ${retryCount + 1}/${MAX_RETRIES + 1}`, { proposalId: proposal.id });
-
-            // 認証チェック
-            let currentUser = auth.currentUser;
-            if (!currentUser) {
-                saveDebugLog("currentUser is null, waiting...");
-                await new Promise(resolve => setTimeout(resolve, 1500));
-                currentUser = auth.currentUser;
-                if (!currentUser) {
-                    throw new Error("ログインセッションが切れました。ページを再読み込みして再ログインしてください。");
-                }
-            }
-
-            // トークン取得（キャッシュを使用して高速化）
-            saveDebugLog("Getting ID token...");
-            const tokenStartTime = Date.now();
-            const token = await Promise.race([
-                currentUser.getIdToken(retryCount === 0), // 初回のみforceRefresh
-                new Promise<never>((_, reject) => 
-                    setTimeout(() => reject(new Error("Token timeout")), 10000)
-                )
-            ]);
-            saveDebugLog("Token obtained", { durationMs: Date.now() - tokenStartTime });
-
-            const requestBody = JSON.stringify({
+            saveDebugLog("Creating contract directly via Firestore...", { proposalId: proposal.id });
+            
+            // クライアントサイドで直接Firestoreに書き込み
+            const contractId = await createContractDirect({
                 proposalId: proposal.id,
                 jobId: job.id,
                 clientId: user.uid,
@@ -322,163 +280,18 @@ export default function MessageRoomPage() {
                 price: proposal.price,
                 title: job.title,
             });
-
-            // 複数の送信方法を並行して試行（レース条件）
-            saveDebugLog("Sending request with multiple methods...");
             
-            const result = await sendWithMultipleMethods(token, requestBody, retryCount);
+            saveDebugLog("SUCCESS!", { contractId });
+            setIsConfirmModalOpen(false);
             
-            if (result.success && result.contractId) {
-                saveDebugLog("SUCCESS!", { contractId: result.contractId });
-                setIsConfirmModalOpen(false);
-                setTimeout(() => {
-                    window.location.href = `/client/contracts/${result.contractId}`;
-                }, 300);
-                return;
-            } else {
-                throw new Error(result.error || "契約作成に失敗しました");
-            }
+            // 契約詳細ページへリダイレクト
+            setTimeout(() => {
+                window.location.href = `/client/contracts/${contractId}`;
+            }, 300);
         } catch (err: any) {
-            saveDebugLog(`Error (attempt ${retryCount + 1}):`, { message: err.message, name: err.name });
-            
-            // リトライ可能なエラーかチェック
-            const isRetryableError = 
-                err.name === 'AbortError' || 
-                err.message?.includes('fetch') ||
-                err.message?.includes('network') ||
-                err.message?.includes('timeout') ||
-                err.message?.includes('Failed') ||
-                err.message?.includes('タイムアウト');
-            
-            if (isRetryableError && retryCount < MAX_RETRIES) {
-                // 段階的バックオフ: 0.5秒, 1秒, 1.5秒, 2秒, 2.5秒, 3秒
-                const waitTime = 500 + (retryCount * 500);
-                saveDebugLog(`Auto-retrying in ${waitTime}ms...`);
-                setErrorMessage(`通信エラー。自動リトライ中... (${retryCount + 1}/${MAX_RETRIES})`);
-                
-                await new Promise(resolve => setTimeout(resolve, waitTime));
-                return executeCreateContract(retryCount + 1);
-            }
-            
-            if (err.name === 'AbortError' || err.message?.includes('timeout')) {
-                setErrorMessage("通信がタイムアウトしました。ネットワーク接続を確認して「再試行」を押してください。");
-            } else {
-                setErrorMessage(err.message || "エラーが発生しました。「再試行」を押してください。");
-            }
+            saveDebugLog(`Error:`, { message: err.message, name: err.name });
+            setErrorMessage(err.message || "エラーが発生しました。「再試行」を押してください。");
             setIsCreatingContract(false);
-        }
-    };
-
-    // 複数の送信方法を試行する関数
-    const sendWithMultipleMethods = async (token: string, body: string, attempt: number): Promise<{success: boolean, contractId?: string, error?: string}> => {
-        const controller = new AbortController();
-        const timeoutMs = 20000; // 20秒タイムアウト
-        
-        // Cloud Run直接URLを使用（環境変数から取得、フォールバックは相対パス）
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || '';
-        const apiUrl = apiBaseUrl ? `${apiBaseUrl}/api/contracts/create` : '/api/contracts/create';
-        saveDebugLog("API URL determined", { apiBaseUrl, apiUrl });
-        
-        // タイムアウト設定
-        const timeoutId = setTimeout(() => {
-            saveDebugLog("Request timeout triggered");
-            controller.abort();
-        }, timeoutMs);
-
-        try {
-            // 方法1: 標準的なfetch（keepalive有効）
-            const fetchPromise = fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
-                },
-                body: body,
-                signal: controller.signal,
-                keepalive: true, // 接続を維持
-            }).then(async (res) => {
-                if (!res.ok) {
-                    const errorText = await res.text();
-                    let errorMsg = `サーバーエラー (${res.status})`;
-                    try {
-                        const errorJson = JSON.parse(errorText);
-                        errorMsg = errorJson.error || errorMsg;
-                    } catch (e) {}
-                    return { success: false, error: errorMsg };
-                }
-                const data = await res.json();
-                if (data.contractId) {
-                    return { success: true, contractId: data.contractId };
-                }
-                return { success: false, error: data.error || "契約IDが返されませんでした" };
-            }).catch((err) => {
-                saveDebugLog("Fetch error:", { message: err.message });
-                return { success: false, error: err.message };
-            });
-
-            // 方法2: XMLHttpRequest（フォールバック）- 2秒後に開始
-            const xhrPromise = new Promise<{success: boolean, contractId?: string, error?: string}>((resolve) => {
-                setTimeout(() => {
-                    if (controller.signal.aborted) {
-                        resolve({ success: false, error: "Aborted" });
-                        return;
-                    }
-                    
-                    saveDebugLog("Starting XHR fallback...", { xhrUrl: apiUrl });
-                    const xhr = new XMLHttpRequest();
-                    xhr.open('POST', apiUrl, true);
-                    xhr.setRequestHeader('Content-Type', 'application/json');
-                    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-                    xhr.timeout = timeoutMs - 2000;
-                    
-                    xhr.onload = () => {
-                        if (xhr.status >= 200 && xhr.status < 300) {
-                            try {
-                                const data = JSON.parse(xhr.responseText);
-                                if (data.contractId) {
-                                    resolve({ success: true, contractId: data.contractId });
-                                } else {
-                                    resolve({ success: false, error: data.error });
-                                }
-                            } catch (e) {
-                                resolve({ success: false, error: "Invalid response" });
-                            }
-                        } else {
-                            resolve({ success: false, error: `XHR Error: ${xhr.status}` });
-                        }
-                    };
-                    
-                    xhr.onerror = () => resolve({ success: false, error: "XHR network error" });
-                    xhr.ontimeout = () => resolve({ success: false, error: "XHR timeout" });
-                    xhr.send(body);
-                }, 2000);
-            });
-
-            // 最初に成功したものを返す
-            const result = await Promise.race([
-                fetchPromise,
-                xhrPromise,
-            ]);
-
-            clearTimeout(timeoutId);
-            
-            // 成功した場合はそのまま返す
-            if (result.success) {
-                return result;
-            }
-            
-            // 両方失敗した場合、もう少し待ってから結果を確認
-            const allResults = await Promise.allSettled([fetchPromise, xhrPromise]);
-            for (const r of allResults) {
-                if (r.status === 'fulfilled' && r.value.success) {
-                    return r.value;
-                }
-            }
-            
-            return result;
-        } catch (err: any) {
-            clearTimeout(timeoutId);
-            return { success: false, error: err.message };
         }
     };
 
