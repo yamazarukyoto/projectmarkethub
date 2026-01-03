@@ -7,8 +7,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { getJob, createProposal, getWorkerProposals, getContracts } from "@/lib/db";
-import { Job, Proposal } from "@/types";
+import { getJob, createProposal, getWorkerProposals, getContracts, getContractsForJob } from "@/lib/db";
+import { Job, Proposal, Contract } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -37,6 +37,7 @@ export default function WorkerJobDetailPage() {
     const [contractId, setContractId] = useState<string | null>(null);
     const [proposalId, setProposalId] = useState<string | null>(null);
     const [files, setFiles] = useState<File[]>([]);
+    const [accessDenied, setAccessDenied] = useState(false);
 
     const {
         register,
@@ -52,7 +53,42 @@ export default function WorkerJobDetailPage() {
                 if (params.id && user) {
                     const jobId = params.id as string;
                     const jobData = await getJob(jobId);
-                    setJob(jobData);
+                    
+                    if (!jobData) {
+                        setJob(null);
+                        setLoading(false);
+                        return;
+                    }
+
+                    // 契約済み案件の閲覧制限チェック
+                    if (jobData.status === 'filled' || jobData.status === 'closed') {
+                        // クライアント本人の場合はアクセス許可
+                        if (jobData.clientId === user.uid) {
+                            setJob(jobData);
+                        } else {
+                            // この案件の契約を取得して、ワーカーかどうか確認
+                            const jobContracts = await getContractsForJob(jobId);
+                            const isContractedWorker = jobContracts.some(
+                                (contract: Contract) => contract.workerId === user.uid
+                            );
+                            
+                            if (isContractedWorker) {
+                                // 契約ワーカーの場合はアクセス許可
+                                setJob(jobData);
+                                const myContract = jobContracts.find((c: Contract) => c.workerId === user.uid);
+                                if (myContract) {
+                                    setContractId(myContract.id);
+                                }
+                            } else {
+                                // 第三者の場合はアクセス拒否
+                                setAccessDenied(true);
+                                setLoading(false);
+                                return;
+                            }
+                        }
+                    } else {
+                        setJob(jobData);
+                    }
 
                     // Check if already applied
                     const myProposals = await getWorkerProposals(user.uid);
@@ -142,6 +178,35 @@ export default function WorkerJobDetailPage() {
     };
 
     if (loading) return <div className="p-8 text-center">読み込み中...</div>;
+    
+    // アクセス拒否時のUI
+    if (accessDenied) {
+        return (
+            <div className="container mx-auto px-4 py-8">
+                <Button variant="ghost" className="mb-4 pl-0" onClick={() => router.back()}>
+                    <ArrowLeft size={20} className="mr-2" />
+                    戻る
+                </Button>
+                <Card>
+                    <CardContent className="p-8 text-center">
+                        <div className="mb-4">
+                            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <X className="text-gray-400" size={32} />
+                            </div>
+                            <h2 className="text-xl font-bold text-gray-800 mb-2">この案件は閲覧できません</h2>
+                            <p className="text-gray-500">
+                                この案件は既に契約済みのため、当事者以外は閲覧できません。
+                            </p>
+                        </div>
+                        <Link href="/worker/search">
+                            <Button>他の案件を探す</Button>
+                        </Link>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+    
     if (!job) return <div className="p-8 text-center">案件が見つかりません</div>;
 
     return (

@@ -543,8 +543,8 @@ export const deleteJob = async (jobId: string, clientId: string): Promise<void> 
         throw new Error("募集中の案件のみ削除できます");
     }
     
-    // 応募者の確認
-    if (job.proposalCount > 0) {
+    // 応募者の確認（proposalCountがundefinedまたは0の場合のみ削除可能）
+    if (job.proposalCount && job.proposalCount > 0) {
         throw new Error("応募者がいる案件は削除できません");
     }
     

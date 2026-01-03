@@ -2,6 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, FieldValue } from "@/lib/firebase-admin";
 import { cancelOrRefundPaymentIntent } from "@/lib/stripe";
 
+// CORSヘッダー
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+// OPTIONSリクエスト（プリフライト）への対応
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 // 管理者メールアドレス
 const ADMIN_EMAIL = "yamazarukyoto@gmail.com";
 
@@ -10,7 +22,7 @@ export async function POST(req: NextRequest) {
         // 1. 認証チェック
         const authHeader = req.headers.get("Authorization");
         if (!authHeader?.startsWith("Bearer ")) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders });
         }
         const token = authHeader.split("Bearer ")[1];
         const decodedToken = await adminAuth.verifyIdToken(token);
@@ -18,20 +30,20 @@ export async function POST(req: NextRequest) {
 
         // 2. 管理者権限チェック
         if (userEmail !== ADMIN_EMAIL) {
-            return NextResponse.json({ error: "Forbidden - 管理者権限が必要です" }, { status: 403 });
+            return NextResponse.json({ error: "Forbidden - 管理者権限が必要です" }, { status: 403, headers: corsHeaders });
         }
 
         // 3. リクエストボディ取得
         const { contractId, reason, refund } = await req.json();
         if (!contractId) {
-            return NextResponse.json({ error: "Contract ID is required" }, { status: 400 });
+            return NextResponse.json({ error: "Contract ID is required" }, { status: 400, headers: corsHeaders });
         }
 
         // 4. 契約情報取得
         const contractRef = adminDb.collection("contracts").doc(contractId);
         const contractDoc = await contractRef.get();
         if (!contractDoc.exists) {
-            return NextResponse.json({ error: "Contract not found" }, { status: 404 });
+            return NextResponse.json({ error: "Contract not found" }, { status: 404, headers: corsHeaders });
         }
         const contract = contractDoc.data();
 
@@ -39,14 +51,14 @@ export async function POST(req: NextRequest) {
         if (contract?.status === 'cancelled') {
             return NextResponse.json({ 
                 error: "この契約は既にキャンセル済みです。" 
-            }, { status: 400 });
+            }, { status: 400, headers: corsHeaders });
         }
 
         // 6. 完了済みの場合は警告
         if (contract?.status === 'completed') {
             return NextResponse.json({ 
                 error: "完了済みの契約はキャンセルできません。返金が必要な場合は別途対応してください。" 
-            }, { status: 400 });
+            }, { status: 400, headers: corsHeaders });
         }
 
         // 7. 返金/キャンセル処理（refund=trueかつPaymentIntentがある場合）
@@ -69,7 +81,7 @@ export async function POST(req: NextRequest) {
                 return NextResponse.json({ 
                     error: "返金/キャンセル処理中にエラーが発生しました。",
                     details: cancelRefundError instanceof Error ? cancelRefundError.message : 'Unknown error'
-                }, { status: 500 });
+                }, { status: 500, headers: corsHeaders });
             }
         }
 
@@ -110,11 +122,11 @@ export async function POST(req: NextRequest) {
             success: true, 
             message,
             paymentAction: cancelRefundResult?.action || null,
-        });
+        }, { headers: corsHeaders });
 
     } catch (error: unknown) {
         console.error("Error force cancelling:", error);
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-        return NextResponse.json({ error: errorMessage }, { status: 500 });
+        return NextResponse.json({ error: errorMessage }, { status: 500, headers: corsHeaders });
     }
 }

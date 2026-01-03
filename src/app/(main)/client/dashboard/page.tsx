@@ -206,7 +206,7 @@ export default function ClientDashboard() {
                         <div className="flex flex-row md:flex-col items-center md:items-end gap-2 w-full md:w-auto justify-between md:justify-start">
                                             <div className="flex items-center gap-2">
                                                 {getStatusBadge(job)}
-                                                {job.status === 'open' && job.proposalCount === 0 && (
+                                                {job.status === 'open' && (!job.proposalCount || job.proposalCount === 0) && (
                                                     <button
                                                         onClick={(e) => handleDeleteJob(e, job)}
                                                         disabled={deletingJobId === job.id}

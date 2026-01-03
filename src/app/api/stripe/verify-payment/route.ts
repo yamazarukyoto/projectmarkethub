@@ -3,12 +3,24 @@ import { stripe } from "@/lib/stripe";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import * as admin from "firebase-admin";
 
+// CORSヘッダー
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+// OPTIONSリクエスト（プリフライト）への対応
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 export async function POST(req: NextRequest) {
   try {
     // 1. 認証チェック
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders });
     }
     const token = authHeader.split("Bearer ")[1];
     const decodedToken = await adminAuth.verifyIdToken(token);
@@ -18,7 +30,7 @@ export async function POST(req: NextRequest) {
     const { jobId, contractId } = await req.json();
 
     if (!jobId && !contractId) {
-      return NextResponse.json({ error: "Job ID or Contract ID is required" }, { status: 400 });
+      return NextResponse.json({ error: "Job ID or Contract ID is required" }, { status: 400, headers: corsHeaders });
     }
 
     let targetRef;
@@ -28,31 +40,31 @@ export async function POST(req: NextRequest) {
     if (jobId) {
         targetRef = adminDb.collection("jobs").doc(jobId);
         const docSnap = await targetRef.get();
-        if (!docSnap.exists) return NextResponse.json({ error: "Job not found" }, { status: 404 });
+        if (!docSnap.exists) return NextResponse.json({ error: "Job not found" }, { status: 404, headers: corsHeaders });
         currentData = docSnap.data();
-        if (currentData?.clientId !== userId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        if (currentData?.clientId !== userId) return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: corsHeaders });
         paymentIntentId = currentData?.stripePaymentIntentId;
     } else {
         targetRef = adminDb.collection("contracts").doc(contractId);
         const docSnap = await targetRef.get();
-        if (!docSnap.exists) return NextResponse.json({ error: "Contract not found" }, { status: 404 });
+        if (!docSnap.exists) return NextResponse.json({ error: "Contract not found" }, { status: 404, headers: corsHeaders });
         currentData = docSnap.data();
-        if (currentData?.clientId !== userId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        if (currentData?.clientId !== userId) return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: corsHeaders });
         paymentIntentId = currentData?.stripePaymentIntentId;
     }
 
     if (!paymentIntentId) {
         // デモモードまたはエラー
         if (currentData?.status === 'open' || currentData?.status === 'escrow') {
-             return NextResponse.json({ success: true, status: currentData.status });
+             return NextResponse.json({ success: true, status: currentData.status }, { headers: corsHeaders });
         }
-        return NextResponse.json({ error: "Payment Intent ID not found" }, { status: 400 });
+        return NextResponse.json({ error: "Payment Intent ID not found" }, { status: 400, headers: corsHeaders });
     }
 
     // 3. Stripe PaymentIntent確認
     // デモ用のIDの場合はスキップ
     if (paymentIntentId === "demo_payment_intent_id") {
-         return NextResponse.json({ success: true, status: currentData?.status });
+         return NextResponse.json({ success: true, status: currentData?.status }, { headers: corsHeaders });
     }
 
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
@@ -71,14 +83,14 @@ export async function POST(req: NextRequest) {
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
         }
-        return NextResponse.json({ success: true });
+        return NextResponse.json({ success: true }, { headers: corsHeaders });
     } else {
-        return NextResponse.json({ error: `Payment status is ${paymentIntent.status}` }, { status: 400 });
+        return NextResponse.json({ error: `Payment status is ${paymentIntent.status}` }, { status: 400, headers: corsHeaders });
     }
 
   } catch (error: unknown) {
     console.error("Error verifying payment:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return NextResponse.json({ error: errorMessage }, { status: 500, headers: corsHeaders });
   }
 }

@@ -3203,6 +3203,87 @@ const corsHeaders = {
 
 ---
 
+## 72. 修正計画（2026-01-03 契約済み案件の閲覧制限）
+
+### 72.1 依頼内容
+契約した案件は、当該クライアントとワーカー以外の閲覧権をなくす。
+
+### 72.2 現状の問題点
+1. **仕事検索ページ（`/worker/search`）**: 全ての案件が表示されており、契約済み案件（`status === 'filled'`）もフィルタリングされていない
+2. **仕事詳細ページ（`/worker/jobs/[id]`）**: 契約済み案件でも詳細が表示される（応募フォームは非表示だが、案件内容は閲覧可能）
+
+### 72.3 修正内容
+
+#### 1. 仕事検索ページ（`src/app/(main)/worker/search/page.tsx`）
+- `filteredJobs`のフィルタリングに、`status === 'open'`の条件を追加
+- 契約済み案件（`status === 'filled'`）や終了案件（`status === 'closed'`）は一覧に表示しない
+
+#### 2. 仕事詳細ページ（`src/app/(main)/worker/jobs/[id]/page.tsx`）
+- 契約済み案件（`status === 'filled'`）の場合、当該クライアントまたはワーカー以外はアクセス不可
+- 第三者がアクセスした場合は「この案件は閲覧できません」と表示
+
+#### 3. db.ts（`src/lib/db.ts`）
+- `getJobs`関数に`status`フィルターを追加するオプションを追加（オプショナル）
+
+### 72.4 実装手順
+1. `src/app/(main)/worker/search/page.tsx` - 募集中案件のみ表示するようにフィルタリング
+2. `src/app/(main)/worker/jobs/[id]/page.tsx` - 契約済み案件の閲覧制限を追加
+3. デプロイして動作確認
+
+---
+
+## 73. 修正計画（2026-01-03 仮決済APIのCORSエラー修正）
+
+### 73.1 問題の概要
+クライアントモードで「仮決済へ進む」ボタンを押すと、APIがタイムアウトして仮決済が完了しない。コンソールログには`Calling create-payment-intent API...`まで表示されるが、その後応答がない。
+
+### 73.2 原因分析
+1. **CORSヘッダーの欠如**: `create-payment-intent` APIにCORSヘッダーが設定されていない
+2. **クロスオリジンリクエスト**: カスタムドメイン（`pj-markethub.com`）からCloud Run直接URL（`projectmarkethub-5ckpwmqfza-an.a.run.app`）へのリクエストがクロスオリジンとなる
+3. **ブラウザによるブロック**: CORSヘッダーがないため、ブラウザがリクエストをブロックしている
+
+### 73.3 修正内容
+
+#### 1. create-payment-intent API (`src/app/api/stripe/create-payment-intent/route.ts`)
+- CORSヘッダーを全てのレスポンスに追加
+- OPTIONSリクエスト（プリフライト）への対応を追加
+
+**追加するCORSヘッダー:**
+```typescript
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+```
+
+### 73.4 実装手順
+1. `src/app/api/stripe/create-payment-intent/route.ts` - CORSヘッダーとOPTIONS対応を追加
+2. デプロイして動作確認
+
+---
+
+## 74. 修正計画（2026-01-03 仮決済タイムアウト問題の修正）
+
+### 74.1 問題の概要
+仮決済から進めない。タイムアウトが発生する。
+
+### 74.2 原因分析
+`verify-payment` APIにCORSヘッダーが設定されていなかった。
+
+クライアント側（`pj-markethub.com`）からCloud Run直接URL（`projectmarkethub-5ckpwmqfza-an.a.run.app`）へのAPIコールはクロスオリジンリクエストとなるため、CORSヘッダーが必要。
+
+### 74.3 修正内容
+`src/app/api/stripe/verify-payment/route.ts`に以下を追加：
+- CORSヘッダー（`Access-Control-Allow-Origin: *`等）
+- OPTIONSリクエスト（プリフライト）への対応
+
+### 74.4 実装完了（2026-01-03）
+- `src/app/api/stripe/verify-payment/route.ts`を修正
+- 全てのレスポンスに`headers: corsHeaders`を追加
+
+---
+
 ## 61. APIコール設計思想（重要）
 
 ### 61.1 背景

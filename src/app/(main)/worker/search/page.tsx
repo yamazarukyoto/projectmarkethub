@@ -37,6 +37,11 @@ export default function JobSearchPage() {
     // フィルタリングされた案件
     const filteredJobs = useMemo(() => {
         return allJobs.filter(job => {
+            // 募集中の案件のみ表示（契約済み・終了案件は非表示）
+            if (job.status !== 'open') {
+                return false;
+            }
+
             // カテゴリーフィルター
             if (category && job.category !== category) {
                 return false;

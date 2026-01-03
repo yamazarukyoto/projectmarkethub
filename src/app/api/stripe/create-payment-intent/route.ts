@@ -2,6 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { adminAuth } from "@/lib/firebase-admin";
 
+// CORSヘッダー
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+// OPTIONSリクエスト（プリフライト）への対応
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 export async function POST(req: NextRequest) {
   console.log("[create-payment-intent] API called");
   const startTime = Date.now();
@@ -11,7 +23,7 @@ export async function POST(req: NextRequest) {
     console.log("[create-payment-intent] Step 1: Auth check");
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders });
     }
     const token = authHeader.split("Bearer ")[1];
     console.log("[create-payment-intent] Step 1.1: Verifying token...");
@@ -30,13 +42,13 @@ export async function POST(req: NextRequest) {
     } = await req.json();
     
     if (!contractId && !jobId) {
-      return NextResponse.json({ error: "Contract ID or Job ID is required" }, { status: 400 });
+      return NextResponse.json({ error: "Contract ID or Job ID is required" }, { status: 400, headers: corsHeaders });
     }
 
     if (!amount || amount < 50) {
       return NextResponse.json({ 
         error: "決済金額が少なすぎます。50円以上の金額を設定してください。" 
-      }, { status: 400 });
+      }, { status: 400, headers: corsHeaders });
     }
 
     // Stripeが無効な場合のデモ動作
@@ -45,7 +57,7 @@ export async function POST(req: NextRequest) {
     
     if (!isStripeConfigured) {
       console.warn("Stripe is not configured. Skipping payment for demo.");
-      return NextResponse.json({ skipped: true, demoMode: true });
+      return NextResponse.json({ skipped: true, demoMode: true }, { headers: corsHeaders });
     }
 
     // 既存のPaymentIntentを確認して再利用またはステータス反映
@@ -61,7 +73,7 @@ export async function POST(req: NextRequest) {
             skipped: true, 
             alreadyAuthorized: true,
             message: "Payment already authorized" 
-          });
+          }, { headers: corsHeaders });
         }
 
         // まだ有効な進行中ステータスの場合、再利用する
@@ -69,7 +81,7 @@ export async function POST(req: NextRequest) {
           // 金額が一致する場合のみ再利用
           if (existingPi.amount === amount) {
             console.log(`[create-payment-intent] Reusing existing PaymentIntent`);
-            return NextResponse.json({ clientSecret: existingPi.client_secret });
+            return NextResponse.json({ clientSecret: existingPi.client_secret }, { headers: corsHeaders });
           }
         }
         
@@ -111,11 +123,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ 
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id
-    });
+    }, { headers: corsHeaders });
 
   } catch (error: unknown) {
     console.error("Error creating payment intent:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return NextResponse.json({ error: errorMessage }, { status: 500, headers: corsHeaders });
   }
 }
