@@ -1,4 +1,5 @@
 steps:
+  # Step 1: Build Docker image
   - name: 'gcr.io/cloud-builders/docker'
     args: [
       'build',
@@ -14,6 +15,26 @@ steps:
       '--build-arg', 'NEXT_PUBLIC_API_URL=${_NEXT_PUBLIC_API_URL}',
       '.'
     ]
+  
+  # Step 2: Push Docker image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'asia-northeast1-docker.pkg.dev/projectmarkethub-db904/projectmarkethub-repo/app:latest']
+  
+  # Step 3: Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'projectmarkethub'
+      - '--image'
+      - 'asia-northeast1-docker.pkg.dev/projectmarkethub-db904/projectmarkethub-repo/app:latest'
+      - '--region'
+      - 'asia-northeast1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+
 images:
   - 'asia-northeast1-docker.pkg.dev/projectmarkethub-db904/projectmarkethub-repo/app:latest'
 
