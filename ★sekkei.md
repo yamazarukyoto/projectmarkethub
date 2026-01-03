@@ -3137,6 +3137,72 @@ const categoryLabels: { [key: string]: string } = {
 
 ---
 
+## 70. 修正計画（2026-01-03 検収完了ボタンが動かない問題の修正）
+
+### 70.1 問題の概要
+クライアントモードで検収完了ボタンを押しても動かない。コンソールログには`PaymentIntent status: requires_capture`と表示されている。
+
+### 70.2 原因分析
+1. **CORSヘッダーの欠如**: `capture-payment-intent` APIにCORSヘッダーが設定されていない
+2. **クロスオリジンリクエスト**: カスタムドメイン（`pj-markethub.com`）からCloud Run直接URL（`projectmarkethub-5ckpwmqfza-an.a.run.app`）へのリクエストがクロスオリジンとなる
+3. **ブラウザによるブロック**: CORSヘッダーがないため、ブラウザがリクエストをブロックしている
+
+### 70.3 修正内容
+
+#### 1. capture-payment-intent API (`src/app/api/stripe/capture-payment-intent/route.ts`)
+- CORSヘッダーを全てのレスポンスに追加
+- OPTIONSリクエスト（プリフライト）への対応を追加
+
+**追加するCORSヘッダー:**
+```typescript
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+```
+
+### 70.4 実装手順
+1. `src/app/api/stripe/capture-payment-intent/route.ts` - CORSヘッダーとOPTIONS対応を追加
+2. デプロイして動作確認
+
+---
+
+## 71. 修正計画（2026-01-03 募集中案件の削除機能追加）
+
+### 71.1 依頼内容
+クライアントダッシュボードの「依頼管理」において、募集中のもののみをクライアントが削除するためのゴミ箱ボタンを作成する。
+
+### 71.2 現状分析
+1. **クライアントダッシュボード（`/client/dashboard`）**: 案件一覧が表示されている
+2. **Firestoreセキュリティルール**: `jobs`コレクションの削除は`clientId == request.auth.uid`で許可済み
+3. **db.ts**: 案件削除関数は存在しない
+
+### 71.3 修正内容
+
+#### 1. db.ts (`src/lib/db.ts`)
+- `deleteJob`関数を追加
+- 募集中（`status === 'open'`）かつ応募者なし（`proposalCount === 0`）の案件のみ削除可能
+
+#### 2. クライアントダッシュボード (`src/app/(main)/client/dashboard/page.tsx`)
+- 各案件カードに削除ボタン（ゴミ箱アイコン）を追加
+- 募集中かつ応募者なしの案件のみ削除ボタンを表示
+- 削除前に確認モーダルを表示
+- 削除成功後、一覧を更新
+
+### 71.4 削除条件
+- **削除可能**: `status === 'open'` かつ `proposalCount === 0`（募集中で応募者なし）
+- **削除不可**: 
+  - `proposalCount > 0`（応募者がいる場合）
+  - `status !== 'open'`（契約済み、終了など）
+
+### 71.5 実装手順
+1. `src/lib/db.ts` - `deleteJob`関数を追加
+2. `src/app/(main)/client/dashboard/page.tsx` - 削除ボタンと確認モーダルを追加
+3. デプロイして動作確認
+
+---
+
 ## 61. APIコール設計思想（重要）
 
 ### 61.1 背景

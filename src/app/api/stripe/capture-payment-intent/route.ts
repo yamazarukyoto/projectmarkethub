@@ -3,12 +3,24 @@ import { stripe } from "@/lib/stripe";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import * as admin from "firebase-admin";
 
+// CORSヘッダー
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+// OPTIONSリクエスト（プリフライト）への対応
+export async function OPTIONS(req: NextRequest) {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 export async function POST(req: NextRequest) {
   try {
     // 1. 認証チェック
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders });
     }
     const token = authHeader.split("Bearer ")[1];
     const decodedToken = await adminAuth.verifyIdToken(token);
@@ -17,26 +29,26 @@ export async function POST(req: NextRequest) {
     // 2. リクエストボディ取得
     const { contractId } = await req.json();
     if (!contractId) {
-      return NextResponse.json({ error: "Contract ID is required" }, { status: 400 });
+      return NextResponse.json({ error: "Contract ID is required" }, { status: 400, headers: corsHeaders });
     }
 
     // 3. 契約情報取得
     const contractRef = adminDb.collection("contracts").doc(contractId);
     const contractDoc = await contractRef.get();
     if (!contractDoc.exists) {
-      return NextResponse.json({ error: "Contract not found" }, { status: 404 });
+      return NextResponse.json({ error: "Contract not found" }, { status: 404, headers: corsHeaders });
     }
     const contract = contractDoc.data();
 
     // 4. 権限チェック (クライアント本人か)
     if (contract?.clientId !== userId) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: corsHeaders });
     }
 
     // 5. PaymentIntentID取得
     const paymentIntentId = contract?.stripePaymentIntentId;
     if (!paymentIntentId) {
-      return NextResponse.json({ error: "PaymentIntent ID not found in contract" }, { status: 400 });
+      return NextResponse.json({ error: "PaymentIntent ID not found in contract" }, { status: 400, headers: corsHeaders });
     }
 
     // デモモード判定
@@ -46,20 +58,20 @@ export async function POST(req: NextRequest) {
             status: "completed",
             completedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        return NextResponse.json({ success: true, skipped: true });
+        return NextResponse.json({ success: true, skipped: true }, { headers: corsHeaders });
     }
 
     // 5.5. ワーカーのStripeアカウント状態チェック (事前チェック)
     // これにより、送金失敗が確定している状態でCaptureしてしまうのを防ぐ
     const workerId = contract?.workerId;
     if (!workerId) {
-         return NextResponse.json({ error: "Worker ID not found in contract" }, { status: 400 });
+         return NextResponse.json({ error: "Worker ID not found in contract" }, { status: 400, headers: corsHeaders });
     }
     const workerDoc = await adminDb.collection("users").doc(workerId).get();
     const workerStripeAccountId = workerDoc.data()?.stripeAccountId;
 
     if (!workerStripeAccountId) {
-        return NextResponse.json({ error: "ワーカーがStripe連携を行っていないため、検収できません。" }, { status: 400 });
+        return NextResponse.json({ error: "ワーカーがStripe連携を行っていないため、検収できません。" }, { status: 400, headers: corsHeaders });
     }
 
     // アカウント状態確認
@@ -73,11 +85,11 @@ export async function POST(req: NextRequest) {
              // エラーとして返す
              return NextResponse.json({ 
                  error: "ワーカーのStripeアカウントが入金可能な状態ではありません（本人確認未完了など）。ワーカーにアカウント設定を確認するよう依頼してください。" 
-             }, { status: 400 });
+             }, { status: 400, headers: corsHeaders });
         }
     } catch (e) {
         console.error("Failed to retrieve worker account:", e);
-        return NextResponse.json({ error: "ワーカーのStripeアカウント情報の取得に失敗しました。" }, { status: 500 });
+        return NextResponse.json({ error: "ワーカーのStripeアカウント情報の取得に失敗しました。" }, { status: 500, headers: corsHeaders });
     }
 
     // 6. PaymentIntent Capture (決済確定)
@@ -103,17 +115,17 @@ export async function POST(req: NextRequest) {
         } else if (paymentIntentObj.status === 'succeeded') {
             paymentIntent = paymentIntentObj;
         } else {
-            return NextResponse.json({ error: `Invalid PaymentIntent status: ${paymentIntentObj.status}` }, { status: 400 });
+            return NextResponse.json({ error: `Invalid PaymentIntent status: ${paymentIntentObj.status}` }, { status: 400, headers: corsHeaders });
         }
 
         if (paymentIntent.status !== "succeeded") {
-            return NextResponse.json({ error: "Failed to capture payment" }, { status: 500 });
+            return NextResponse.json({ error: "Failed to capture payment" }, { status: 500, headers: corsHeaders });
         }
     } catch (error: any) {
         console.error("Capture failed:", error);
         return NextResponse.json({ 
             error: "決済の確定に失敗しました。" + (error.message ? ` (${error.message})` : "")
-        }, { status: 500 });
+        }, { status: 500, headers: corsHeaders });
     }
 
     // 7. Transfer to Worker (報酬の引き渡し)
@@ -165,7 +177,7 @@ export async function POST(req: NextRequest) {
             error: "支払いは確定しましたが、ワーカーへの送金処理に失敗しました。システム管理者にお問い合わせください。",
             code: "transfer_failed",
             details: error.message
-        }, { status: 500 });
+        }, { status: 500, headers: corsHeaders });
     }
 
     // 8. DB更新 (全て成功した場合のみ完了)
@@ -180,11 +192,11 @@ export async function POST(req: NextRequest) {
         success: true, 
         paymentIntentId: paymentIntent.id,
         paymentIntentStatus: paymentIntent.status
-    });
+    }, { headers: corsHeaders });
 
   } catch (error: unknown) {
     console.error("Error capturing payment intent:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return NextResponse.json({ error: errorMessage }, { status: 500, headers: corsHeaders });
   }
 }

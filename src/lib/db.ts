@@ -521,6 +521,38 @@ export const getClientJobs = async (clientId: string): Promise<Job[]> => {
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Job));
 };
 
+// Delete Job Function
+// 募集中（status === 'open'）かつ応募者なし（proposalCount === 0）の案件のみ削除可能
+export const deleteJob = async (jobId: string, clientId: string): Promise<void> => {
+    const jobRef = doc(db, "jobs", jobId);
+    const jobSnap = await getDoc(jobRef);
+    
+    if (!jobSnap.exists()) {
+        throw new Error("案件が見つかりません");
+    }
+    
+    const job = jobSnap.data() as Job;
+    
+    // クライアントIDの確認
+    if (job.clientId !== clientId) {
+        throw new Error("この案件を削除する権限がありません");
+    }
+    
+    // ステータスの確認
+    if (job.status !== 'open') {
+        throw new Error("募集中の案件のみ削除できます");
+    }
+    
+    // 応募者の確認
+    if (job.proposalCount > 0) {
+        throw new Error("応募者がいる案件は削除できません");
+    }
+    
+    // 削除実行
+    const { deleteDoc } = await import("firebase/firestore");
+    await deleteDoc(jobRef);
+};
+
 // Additional Contract Functions
 export const updatePaymentIntentId = async (contractId: string, paymentIntentId: string): Promise<void> => {
     const docRef = doc(db, "contracts", contractId);

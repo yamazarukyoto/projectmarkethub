@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Plus, Briefcase, Users, Clock } from "lucide-react";
-import { getJobs } from "@/lib/db";
+import { Plus, Briefcase, Users, Clock, Trash2 } from "lucide-react";
+import { getJobs, deleteJob } from "@/lib/db";
 import { Job } from "@/types";
 
 export default function ClientDashboard() {
@@ -14,6 +14,26 @@ export default function ClientDashboard() {
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<'all' | 'open' | 'filled' | 'closed'>('all');
+    const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
+
+    const handleDeleteJob = async (e: React.MouseEvent, job: Job) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        if (!user?.uid) return;
+        if (!confirm(`「${job.title}」を削除しますか？この操作は取り消せません。`)) return;
+        
+        setDeletingJobId(job.id);
+        try {
+            await deleteJob(job.id, user.uid);
+            setJobs(prev => prev.filter(j => j.id !== job.id));
+            alert("案件を削除しました");
+        } catch (error: any) {
+            alert(error.message || "削除に失敗しました");
+        } finally {
+            setDeletingJobId(null);
+        }
+    };
 
     useEffect(() => {
         const fetchJobs = async () => {
@@ -183,8 +203,20 @@ export default function ClientDashboard() {
                                                 ))}
                                             </div>
                                         </div>
-                                        <div className="flex flex-row md:flex-col items-center md:items-end gap-2 w-full md:w-auto justify-between md:justify-start">
-                                            {getStatusBadge(job)}
+                        <div className="flex flex-row md:flex-col items-center md:items-end gap-2 w-full md:w-auto justify-between md:justify-start">
+                                            <div className="flex items-center gap-2">
+                                                {getStatusBadge(job)}
+                                                {job.status === 'open' && job.proposalCount === 0 && (
+                                                    <button
+                                                        onClick={(e) => handleDeleteJob(e, job)}
+                                                        disabled={deletingJobId === job.id}
+                                                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+                                                        title="削除"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
                                             <span className="text-xs text-gray-400 whitespace-nowrap">
                                                 {job.createdAt.toDate().toLocaleDateString()}
                                             </span>
