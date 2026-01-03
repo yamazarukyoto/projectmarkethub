@@ -2987,6 +2987,33 @@ curl -w "\nTotal time: %{time_total}s\n" -X POST "https://projectmarkethub-5ckpw
 
 ---
 
+## 67. 修正計画（2026-01-03 仮決済前のキャンセルボタン有効化）
+
+### 67.1 問題の概要
+仮決済前のキャンセルボタンが有効でない。クリックしても反応しない。
+
+### 67.2 原因分析
+1. **CORSヘッダーの欠如**: `cancel-request` APIにCORSヘッダーが設定されていないため、カスタムドメイン（`pj-markethub.com`）からCloud Run直接URL（`projectmarkethub-5ckpwmqfza-an.a.run.app`）へのクロスオリジンリクエストがブロックされる。
+2. **OPTIONSリクエスト未対応**: ブラウザはクロスオリジンリクエストの前にプリフライトリクエスト（OPTIONS）を送信するが、これに対応していない。
+3. **cancel-approve APIも同様**: キャンセル承認APIにも同じ問題がある。
+
+### 67.3 修正内容
+
+#### 1. cancel-request API (`src/app/api/contracts/cancel-request/route.ts`)
+- CORSヘッダーを全てのレスポンスに追加
+- OPTIONSリクエストへの対応を追加
+
+#### 2. cancel-approve API (`src/app/api/contracts/cancel-approve/route.ts`)
+- CORSヘッダーを全てのレスポンスに追加
+- OPTIONSリクエストへの対応を追加
+
+### 67.4 実装手順
+1. `src/app/api/contracts/cancel-request/route.ts` - CORSヘッダーとOPTIONS対応を追加
+2. `src/app/api/contracts/cancel-approve/route.ts` - CORSヘッダーとOPTIONS対応を追加
+3. デプロイして動作確認
+
+---
+
 ## 65. 修正計画（2026-01-03 表示名の共通化・必須化とワーカープロフィールの任意化）
 
 ### 65.1 依頼内容
