@@ -16,6 +16,15 @@ import { Timestamp } from "firebase/firestore";
 import { Upload, X, FileText } from "lucide-react";
 import { PaymentModal } from "@/components/features/contract/PaymentModal";
 
+// カテゴリーの日本語マッピング
+const categoryLabels: { [key: string]: string } = {
+    'web_dev': 'Web開発',
+    'design': 'デザイン',
+    'writing': 'ライティング',
+    'video': '動画編集',
+    'other': 'その他',
+};
+
 const jobSchema = z.object({
     title: z.string().min(1, "タイトルを入力してください"),
     description: z.string().min(1, "詳細を入力してください"),
@@ -361,17 +370,33 @@ export default function PostJobPage() {
                                 <p className="text-lg font-medium">{pendingJobData.title}</p>
                             </div>
                             <div>
-                                <h4 className="text-sm font-bold text-gray-500">依頼形式</h4>
-                                <p>プロジェクト方式</p>
+                                <h4 className="text-sm font-bold text-gray-500">詳細</h4>
+                                <div className="max-h-32 overflow-y-auto bg-gray-50 p-3 rounded-lg text-sm text-gray-700 whitespace-pre-wrap">
+                                    {pendingJobData.description}
+                                </div>
                             </div>
                             <div>
                                 <h4 className="text-sm font-bold text-gray-500">カテゴリー</h4>
-                                <p>{pendingJobData.category}</p>
+                                <p>{categoryLabels[pendingJobData.category] || pendingJobData.category}</p>
                             </div>
                             <div>
                                 <h4 className="text-sm font-bold text-gray-500">期限</h4>
                                 <p>{pendingJobData.deadline}</p>
                             </div>
+                            {files.length > 0 && (
+                                <div>
+                                    <h4 className="text-sm font-bold text-gray-500">添付ファイル</h4>
+                                    <div className="mt-1 space-y-1">
+                                        {files.map((file, index) => (
+                                            <div key={index} className="flex items-center gap-2 text-sm text-gray-600">
+                                                <FileText className="h-4 w-4 text-gray-400" />
+                                                <span className="truncate">{file.name}</span>
+                                                <span className="text-xs text-gray-400">({(file.size / 1024).toFixed(1)} KB)</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="bg-gray-50 p-4 rounded-lg border">
                                 <h4 className="text-sm font-bold text-gray-900 mb-2">お支払い金額（概算）</h4>
