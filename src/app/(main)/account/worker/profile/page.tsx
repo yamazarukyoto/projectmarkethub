@@ -75,10 +75,9 @@ export default function WorkerProfilePage() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              キャッチコピー <span className="text-red-500">*</span>
+              キャッチコピー
             </label>
             <Input
-              required
               maxLength={50}
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -88,10 +87,9 @@ export default function WorkerProfilePage() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              自己紹介 <span className="text-red-500">*</span>
+              自己紹介
             </label>
             <textarea
-              required
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary min-h-[200px]"
               value={formData.bio}
               onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
@@ -112,7 +110,7 @@ export default function WorkerProfilePage() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              稼働可能時間 <span className="text-red-500">*</span>
+              稼働可能時間
             </label>
             <select
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"

@@ -4,9 +4,10 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { doc, updateDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Building2, Globe, MapPin, Phone, Save } from "lucide-react";
+import { Building2, Globe, MapPin, Phone, Save, User } from "lucide-react";
 
 interface ClientProfile {
+    displayName: string;
     companyName?: string;
     website?: string;
     companyAddress?: string;
@@ -21,6 +22,7 @@ export default function ClientProfilePage() {
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
     const [profile, setProfile] = useState<ClientProfile>({
+        displayName: "",
         companyName: "",
         website: "",
         companyAddress: "",
@@ -40,6 +42,7 @@ export default function ClientProfilePage() {
                     // clientProfileオブジェクトから読み取る（フォールバックとしてフラット構造も対応）
                     const clientProfile = data.clientProfile || {};
                     setProfile({
+                        displayName: data.displayName || "",
                         companyName: clientProfile.companyName || data.companyName || "",
                         website: clientProfile.website || data.companyWebsite || "",
                         companyAddress: clientProfile.companyAddress || data.companyAddress || "",
@@ -66,8 +69,9 @@ export default function ClientProfilePage() {
         setMessage(null);
 
         try {
-            // clientProfileオブジェクトとして保存（設計書に準拠）
+            // displayNameはルートレベル、その他はclientProfileオブジェクトとして保存（設計書に準拠）
             await updateDoc(doc(db, "users", firebaseUser.uid), {
+                displayName: profile.displayName,
                 clientProfile: {
                     companyName: profile.companyName,
                     website: profile.website,
@@ -113,6 +117,22 @@ export default function ClientProfilePage() {
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                 <form onSubmit={handleSubmit} className="space-y-6">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <User size={16} className="inline mr-2" />
+                            表示名 <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            required
+                            value={profile.displayName}
+                            onChange={(e) => setProfile({ ...profile, displayName: e.target.value })}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                            placeholder="ニックネーム可"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">ワーカーに公開される名前です。</p>
+                    </div>
+
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             <Building2 size={16} className="inline mr-2" />
