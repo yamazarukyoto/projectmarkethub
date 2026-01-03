@@ -527,6 +527,35 @@ export const updatePaymentIntentId = async (contractId: string, paymentIntentId:
     await updateDoc(docRef, { stripePaymentIntentId: paymentIntentId });
 };
 
+// 契約をescrowステータスに更新（仮決済完了時）
+export const updateContractToEscrow = async (contractId: string, paymentIntentId?: string): Promise<void> => {
+    const docRef = doc(db, "contracts", contractId);
+    const updates: Record<string, unknown> = {
+        status: 'escrow',
+        escrowAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+    };
+    if (paymentIntentId) {
+        updates.stripePaymentIntentId = paymentIntentId;
+    }
+    await updateDoc(docRef, updates);
+    
+    // ワーカーに通知
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+        const contract = docSnap.data() as Contract;
+        await createNotification({
+            userId: contract.workerId,
+            type: 'payment',
+            title: '仮払いが完了しました',
+            body: 'クライアントの仮払いが完了しました。業務を開始してください。',
+            link: `/worker/contracts/${contractId}`,
+            read: false,
+            createdAt: Timestamp.now()
+        });
+    }
+};
+
 // Get completed contracts count for a worker
 export const getCompletedContractsCount = async (workerId: string): Promise<number> => {
     try {

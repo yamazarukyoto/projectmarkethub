@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { updateContractStatus, submitReview } from "@/lib/db";
+import { updateContractStatus, submitReview, updatePaymentIntentId, updateContractToEscrow } from "@/lib/db";
 import { Contract } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -123,7 +123,12 @@ export default function ClientContractDetailPage() {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify({ contractId: contract.id }),
+                body: JSON.stringify({ 
+                    contractId: contract.id,
+                    amount: contract.totalAmount,
+                    workerId: contract.workerId,
+                    existingPaymentIntentId: contract.stripePaymentIntentId || null
+                }),
             });
             console.log("API response status:", res.status);
             const data = await res.json();
@@ -131,10 +136,21 @@ export default function ClientContractDetailPage() {
             if (data.error) throw new Error(data.error);
             
             if (data.skipped) {
-                console.log("Payment skipped (demo mode)");
-                setContract({ ...contract, status: 'escrow' });
-                alert("仮決済（デモ）が完了しました。");
+                console.log("Payment skipped (demo mode or already authorized)");
+                // デモモードまたは既に認証済みの場合、クライアント側でステータスを更新
+                if (data.demoMode) {
+                    await updateContractToEscrow(contract.id, "demo_payment_intent_id");
+                } else if (data.alreadyAuthorized) {
+                    await updateContractToEscrow(contract.id);
+                }
+                alert("仮決済が完了しました。");
                 return;
+            }
+
+            // PaymentIntentIDをクライアント側でFirestoreに保存
+            if (data.paymentIntentId) {
+                console.log("Saving PaymentIntentId to Firestore:", data.paymentIntentId);
+                await updatePaymentIntentId(contract.id, data.paymentIntentId);
             }
 
             console.log("Opening payment modal with clientSecret:", data.clientSecret ? "present" : "missing");
