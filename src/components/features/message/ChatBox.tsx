@@ -218,7 +218,9 @@ export function ChatBox({ roomId, currentUserId }: ChatBoxProps) {
                     </a>
                   </div>
                 )}
-                <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                <div className="max-h-40 overflow-y-auto">
+                  <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                </div>
                 <div className="flex justify-between items-center mt-1 gap-2">
                   <span className={`text-xs ${isMyMessage ? "text-primary-100" : "text-gray-500"}`}>
                     {msg.createdAt?.seconds ? new Date(msg.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}

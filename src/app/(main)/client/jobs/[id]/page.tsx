@@ -151,6 +151,8 @@ export default function ClientJobDetailPage() {
                                             // ファイル名が空の場合、URLからファイル名を抽出
                                             const getFileNameFromUrl = (url: string, fallbackIndex: number) => {
                                                 try {
+                                                    console.log('Processing URL:', url);
+                                                    
                                                     // Firebase Storage URL形式: 
                                                     // https://firebasestorage.googleapis.com/v0/b/bucket/o/job-attachments%2F1234567890_filename.pdf?alt=media&token=xxx
                                                     
@@ -163,16 +165,21 @@ export default function ClientJobDetailPage() {
                                                         }
                                                     }
                                                     
+                                                    console.log('Encoded path:', encodedPath);
+                                                    
                                                     if (!encodedPath) {
+                                                        console.log('No encoded path found, returning fallback');
                                                         return `ファイル${fallbackIndex + 1}`;
                                                     }
                                                     
                                                     // URLデコード（%2Fを/に変換など）
                                                     const decodedPath = decodeURIComponent(encodedPath);
+                                                    console.log('Decoded path:', decodedPath);
                                                     
                                                     // パスの最後の部分を取得
                                                     const parts = decodedPath.split('/');
                                                     let lastPart = parts[parts.length - 1];
+                                                    console.log('Last part:', lastPart);
                                                     
                                                     if (!lastPart) {
                                                         return `ファイル${fallbackIndex + 1}`;
@@ -183,14 +190,17 @@ export default function ClientJobDetailPage() {
                                                     if (lastPart.includes('_')) {
                                                         const underscoreIndex = lastPart.indexOf('_');
                                                         const beforeUnderscore = lastPart.substring(0, underscoreIndex);
+                                                        console.log('Before underscore:', beforeUnderscore);
                                                         // 最初の部分が13桁程度の数字（タイムスタンプ）の場合のみスキップ
                                                         if (/^\d{10,15}$/.test(beforeUnderscore)) {
                                                             const fileName = lastPart.substring(underscoreIndex + 1);
+                                                            console.log('Extracted filename:', fileName);
                                                             return fileName || `ファイル${fallbackIndex + 1}`;
                                                         }
                                                     }
                                                     return lastPart;
-                                                } catch {
+                                                } catch (e) {
+                                                    console.error('Error extracting filename:', e);
                                                     return `ファイル${fallbackIndex + 1}`;
                                                 }
                                             };
