@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     const userId = decodedToken.uid;
 
     // 2. リクエストボディ取得
-    const { jobId, contractId } = await req.json();
+    const { jobId, contractId, newPaymentIntentId } = await req.json();
 
     if (!jobId && !contractId) {
       return NextResponse.json({ error: "Job ID or Contract ID is required" }, { status: 400, headers: corsHeaders });
@@ -43,14 +43,16 @@ export async function POST(req: NextRequest) {
         if (!docSnap.exists) return NextResponse.json({ error: "Job not found" }, { status: 404, headers: corsHeaders });
         currentData = docSnap.data();
         if (currentData?.clientId !== userId) return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: corsHeaders });
-        paymentIntentId = currentData?.stripePaymentIntentId;
+        // 新しいPaymentIntentIDが渡された場合はそれを使用（再仮払い対応）
+        paymentIntentId = newPaymentIntentId || currentData?.stripePaymentIntentId;
     } else {
         targetRef = adminDb.collection("contracts").doc(contractId);
         const docSnap = await targetRef.get();
         if (!docSnap.exists) return NextResponse.json({ error: "Contract not found" }, { status: 404, headers: corsHeaders });
         currentData = docSnap.data();
         if (currentData?.clientId !== userId) return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: corsHeaders });
-        paymentIntentId = currentData?.stripePaymentIntentId;
+        // 新しいPaymentIntentIDが渡された場合はそれを使用（再仮払い対応）
+        paymentIntentId = newPaymentIntentId || currentData?.stripePaymentIntentId;
     }
 
     if (!paymentIntentId) {
@@ -72,16 +74,26 @@ export async function POST(req: NextRequest) {
     if (paymentIntent.status === "requires_capture" || paymentIntent.status === "succeeded") {
         // 4. ステータス更新
         if (jobId) {
-            await targetRef.update({
+            const updateData: Record<string, unknown> = {
                 status: "open",
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
+            };
+            // 新しいPaymentIntentIDがある場合は更新
+            if (newPaymentIntentId) {
+                updateData.stripePaymentIntentId = newPaymentIntentId;
+            }
+            await targetRef.update(updateData);
         } else {
-            await targetRef.update({
+            const updateData: Record<string, unknown> = {
                 status: "escrow",
                 escrowAt: admin.firestore.FieldValue.serverTimestamp(),
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
+            };
+            // 新しいPaymentIntentIDがある場合は更新（再仮払い対応）
+            if (newPaymentIntentId) {
+                updateData.stripePaymentIntentId = newPaymentIntentId;
+            }
+            await targetRef.update(updateData);
         }
         return NextResponse.json({ success: true }, { headers: corsHeaders });
     } else {

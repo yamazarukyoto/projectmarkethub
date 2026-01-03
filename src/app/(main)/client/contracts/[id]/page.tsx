@@ -262,6 +262,7 @@ export default function ClientContractDetailPage() {
                             contract.status === 'escrow' ? 'bg-cyan-100 text-cyan-800' :
                             contract.status === 'pending_signature' ? 'bg-orange-100 text-orange-800' :
                             contract.status === 'transfer_failed' ? 'bg-red-100 text-red-800' :
+                            contract.status === 'payment_expired' ? 'bg-red-100 text-red-800' :
                             'bg-yellow-100 text-yellow-800'
                         }`}>
                             {contract.status === 'completed' ? '完了' :
@@ -270,7 +271,8 @@ export default function ClientContractDetailPage() {
                              contract.status === 'escrow' ? '仮決済済み' :
                              contract.status === 'waiting_for_escrow' ? '仮決済待ち' :
                              contract.status === 'pending_signature' ? '契約合意待ち' :
-                             contract.status === 'transfer_failed' ? '送金エラー' : contract.status}
+                             contract.status === 'transfer_failed' ? '送金エラー' :
+                             contract.status === 'payment_expired' ? '仮決済期限切れ' : contract.status}
                         </span>
                     </div>
                 </CardHeader>
@@ -463,6 +465,30 @@ export default function ClientContractDetailPage() {
                                     </Button>
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {/* 仮決済期限切れ - 再仮払いボタン */}
+                    {contract.status === 'payment_expired' && (
+                        <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+                            <h4 className="font-bold text-red-900 mb-2 flex items-center gap-2">
+                                <AlertCircle size={18} />
+                                仮決済の期限が切れました
+                            </h4>
+                            <p className="text-sm text-red-800 mb-4">
+                                Stripeの仮決済（オーソリ）は7日間の有効期限があります。
+                                期限内に検収が完了しなかったため、仮決済がキャンセルされました。
+                                <br /><br />
+                                契約を継続する場合は、再度仮払いを行ってください。
+                            </p>
+                            <Button 
+                                onClick={handleEscrow} 
+                                disabled={isProcessing} 
+                                className="bg-accent hover:bg-accent/90 text-white"
+                            >
+                                <CreditCard size={16} className="mr-2" />
+                                再仮払いを行う
+                            </Button>
                         </div>
                     )}
 
