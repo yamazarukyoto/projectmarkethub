@@ -278,14 +278,14 @@ export const createContractDirect = async (params: {
         }
     }
     
-    // 金額計算
-    const TAX_RATE = 0.1;
-    const PLATFORM_FEE_RATE = 0.15;
-    const amount = price;
-    const tax = Math.floor(amount * TAX_RATE);
-    const totalAmount = amount + tax;
-    const platformFee = Math.floor(amount * PLATFORM_FEE_RATE);
-    const workerReceiveAmount = amount - platformFee;
+    // 金額計算（入力金額は税込）
+    // 税抜金額 = 税込金額 × 10 / 11（四捨五入で正確な計算）
+    const PLATFORM_FEE_RATE = 0.05;  // 5%
+    const totalAmount = price;  // 入力金額 = 税込金額
+    const amount = Math.round(totalAmount * 10 / 11);  // 税抜金額
+    const tax = totalAmount - amount;  // 消費税
+    const platformFee = Math.floor(totalAmount * PLATFORM_FEE_RATE);  // 手数料（税込の5%）
+    const workerReceiveAmount = totalAmount - platformFee;  // ワーカー受取額
     
     // 契約データを作成
     const contractData: Omit<Contract, "id"> = {

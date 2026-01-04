@@ -7,8 +7,8 @@ import { updateContractStatus, submitReview, updatePaymentIntentId, updateContra
 import { Contract } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { ArrowLeft, CheckCircle, Clock, FileText, CreditCard, MessageSquare, AlertCircle, XCircle, AlertTriangle } from "lucide-react";
-import { doc, onSnapshot } from "firebase/firestore";
+import { ArrowLeft, CheckCircle, Clock, FileText, CreditCard, MessageSquare, AlertCircle, XCircle, AlertTriangle, Download } from "lucide-react";
+import { doc, onSnapshot, getDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import Link from "next/link";
 import { PaymentModal } from "@/components/features/contract/PaymentModal";
@@ -287,17 +287,12 @@ export default function ClientContractDetailPage() {
                                 契約金額
                             </h3>
                             <div className="text-sm">
-                                <div className="flex justify-between gap-4">
-                                    <span>契約金額 (税抜):</span>
-                                    <span>{contract.amount.toLocaleString()}円</span>
-                                </div>
-                                <div className="flex justify-between gap-4">
-                                    <span>消費税 (10%):</span>
-                                    <span>{contract.tax.toLocaleString()}円</span>
-                                </div>
-                                <div className="flex justify-between gap-4 font-bold border-t pt-1 mt-1">
+                                <div className="flex justify-between gap-4 font-bold text-lg">
                                     <span>支払総額 (税込):</span>
                                     <span>{contract.totalAmount.toLocaleString()}円</span>
+                                </div>
+                                <div className="flex justify-between gap-4 text-gray-500 text-xs mt-1">
+                                    <span>（税抜: {contract.amount.toLocaleString()}円 / 消費税: {contract.tax.toLocaleString()}円）</span>
                                 </div>
                             </div>
                         </div>
@@ -465,6 +460,57 @@ export default function ClientContractDetailPage() {
                                     </Button>
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {/* 領収書ダウンロードセクション */}
+                    {contract.status === 'completed' && contract.completedAt && (
+                        <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                            <h4 className="font-bold text-green-900 mb-2 flex items-center gap-2">
+                                <FileText size={18} />
+                                領収書
+                            </h4>
+                            <p className="text-sm text-green-800 mb-4">
+                                この取引の領収書をPDFでダウンロードできます。経費精算や確定申告にご利用ください。
+                            </p>
+                            <Button
+                                onClick={async () => {
+                                    try {
+                                        // ワーカー名を取得
+                                        let workerName = '（名称未設定）';
+                                        try {
+                                            const workerDoc = await getDoc(doc(db, "users", contract.workerId));
+                                            if (workerDoc.exists()) {
+                                                const workerData = workerDoc.data();
+                                                workerName = workerData.displayName || workerData.name || '（名称未設定）';
+                                            }
+                                        } catch (e) {
+                                            console.error("Error fetching worker name:", e);
+                                        }
+
+                                        const { generateReceiptPDF } = await import('@/lib/pdf-generator');
+                                        await generateReceiptPDF({
+                                            receiptNumber: contract.id,
+                                            issueDate: new Date(),
+                                            clientName: user?.displayName || user?.email || 'N/A',
+                                            workerName: workerName,
+                                            jobTitle: contract.jobTitle,
+                                            amount: contract.amount,
+                                            tax: contract.tax,
+                                            totalAmount: contract.totalAmount,
+                                            completedAt: contract.completedAt ? contract.completedAt.toDate() : new Date(),
+                                        });
+                                    } catch (error) {
+                                        console.error('Error generating receipt:', error);
+                                        alert('領収書の生成に失敗しました。');
+                                    }
+                                }}
+                                variant="outline"
+                                className="text-green-700 border-green-300 hover:bg-green-100"
+                            >
+                                <Download size={16} className="mr-2" />
+                                領収書をダウンロード (PDF)
+                            </Button>
                         </div>
                     )}
 

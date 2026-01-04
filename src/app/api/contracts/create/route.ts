@@ -92,8 +92,12 @@ export async function POST(req: Request) {
         log("Job fetched");
 
         // 6. Create contract with fixed document ID (冪等性を保証)
-        const platformFee = Math.floor(price * 0.05);
-        const workerAmount = price - platformFee;
+        // 新仕様: priceは税込金額として扱う
+        // 税抜金額 = 税込金額 × 10 / 11（四捨五入で正確な計算）
+        const amountExcludingTax = Math.round(price * 10 / 11);
+        const tax = price - amountExcludingTax;
+        const platformFee = Math.floor(amountExcludingTax * 0.05);  // 税抜金額の5%
+        const workerAmount = price - platformFee;  // 税込金額 - 手数料 = ワーカー受取額
 
         log(`Creating contract with ID: ${contractDocId}`);
         await contractRef.set({
@@ -103,9 +107,9 @@ export async function POST(req: Request) {
             workerId,
             jobTitle: title || jobData?.title,
             jobType: "project",
-            amount: price,
-            tax: Math.floor(price * 0.1),
-            totalAmount: Math.round(price * 1.1),
+            amount: amountExcludingTax,  // 税抜金額
+            tax: tax,
+            totalAmount: price,  // 税込金額（クライアント支払額）
             platformFee: platformFee,
             workerReceiveAmount: workerAmount,
             status: "pending_signature",

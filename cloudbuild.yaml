@@ -34,6 +34,7 @@ steps:
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
+      - '--min-instances=1'
 
 images:
   - 'asia-northeast1-docker.pkg.dev/projectmarkethub-db904/projectmarkethub-repo/app:latest'

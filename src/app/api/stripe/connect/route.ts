@@ -125,12 +125,21 @@ export async function POST(req: Request) {
         }
 
         // Create a Stripe Connect account
+        // 入金スケジュール: 毎月25日（入金手数料はワーカー負担）
         const account = await stripe.accounts.create({
             type: "express",
             country: "JP",
             capabilities: {
                 card_payments: { requested: true },
                 transfers: { requested: true },
+            },
+            settings: {
+                payouts: {
+                    schedule: {
+                        interval: "monthly",
+                        monthly_anchor: 25,  // 毎月25日に入金
+                    },
+                },
             },
         });
 

@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, Suspense, useCallback } from "react";
+import React, { useState, useEffect, Suspense, useCallback, useMemo } from "react";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { CreditCard, CheckCircle, ExternalLink, History, Wallet, AlertCircle, Download } from "lucide-react";
+import { CreditCard, CheckCircle, ExternalLink, History, Wallet, AlertCircle, Download, FileText, Calendar } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -28,6 +28,85 @@ function PaymentSettingsContent() {
     const [totalEarnings, setTotalEarnings] = useState(0);
     const [stripeStatus, setStripeStatus] = useState<any>(null);
     const [statusLoading, setStatusLoading] = useState(true);
+    
+    // 期間フィルター用のstate
+    const currentYear = new Date().getFullYear();
+    const [selectedYear, setSelectedYear] = useState<number | "all">("all");
+    const [selectedMonth, setSelectedMonth] = useState<number | "all">("all");
+    // 支払調書用の年選択state
+    const [paymentStatementYear, setPaymentStatementYear] = useState<number>(currentYear);
+
+    // 利用可能な年のリストを生成（データがある年のみ）
+    const availableYears = useMemo(() => {
+        const years = new Set<number>();
+        completedContracts.forEach((contract) => {
+            if (contract.completedAt) {
+                years.add(contract.completedAt.getFullYear());
+            }
+        });
+        return Array.from(years).sort((a, b) => b - a); // 降順
+    }, [completedContracts]);
+
+    // 支払調書の年を初期化
+    useEffect(() => {
+        if (availableYears.length > 0 && !availableYears.includes(paymentStatementYear)) {
+            setPaymentStatementYear(availableYears[0]);
+        }
+    }, [availableYears, paymentStatementYear]);
+
+    // フィルタリングされた契約リスト
+    const filteredContracts = useMemo(() => {
+        return completedContracts.filter((contract) => {
+            if (!contract.completedAt) return selectedYear === "all";
+            
+            const contractYear = contract.completedAt.getFullYear();
+            const contractMonth = contract.completedAt.getMonth() + 1; // 0-indexed to 1-indexed
+            
+            if (selectedYear !== "all" && contractYear !== selectedYear) {
+                return false;
+            }
+            if (selectedMonth !== "all" && contractMonth !== selectedMonth) {
+                return false;
+            }
+            return true;
+        });
+    }, [completedContracts, selectedYear, selectedMonth]);
+
+    // フィルタリングされた期間の合計
+    const filteredTotal = useMemo(() => {
+        return filteredContracts.reduce((sum, contract) => sum + contract.workerReceiveAmount, 0);
+    }, [filteredContracts]);
+
+    // 年間支払調書PDFダウンロード
+    const handleDownloadPaymentStatement = async (year: number) => {
+        if (!user) return;
+        
+        // 指定年のデータをフィルタリング
+        const yearContracts = completedContracts.filter((contract) => {
+            if (!contract.completedAt) return false;
+            return contract.completedAt.getFullYear() === year;
+        });
+
+        if (yearContracts.length === 0) {
+            alert(`${year}年のデータがありません。`);
+            return;
+        }
+
+        const yearTotal = yearContracts.reduce((sum, c) => sum + c.workerReceiveAmount, 0);
+
+        // PDF生成（動的インポート）
+        const { generatePaymentStatementPDF } = await import("@/lib/pdf-generator");
+        await generatePaymentStatementPDF({
+            year,
+            workerName: user.displayName || user.email || "N/A",
+            totalAmount: yearTotal,
+            contracts: yearContracts.map((c) => ({
+                jobTitle: c.jobTitle,
+                amount: c.workerReceiveAmount,
+                completedAt: c.completedAt || new Date(),
+            })),
+        });
+    };
 
     // Stripeアカウントの状態を取得
     const fetchStripeStatus = useCallback(async () => {
@@ -327,14 +406,124 @@ function PaymentSettingsContent() {
                 </CardContent>
             </Card>
 
+            {/* 期間別サマリー・支払調書カード */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Calendar /> 期間別サマリー・支払調書
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    {/* 期間フィルター */}
+                    <div className="flex flex-wrap gap-4 items-end">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">年</label>
+                            <select
+                                value={selectedYear}
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    setSelectedYear(value === "all" ? "all" : parseInt(value));
+                                    if (value === "all") setSelectedMonth("all");
+                                }}
+                                className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                            >
+                                <option value="all">全期間</option>
+                                {availableYears.map((year) => (
+                                    <option key={year} value={year}>{year}年</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">月</label>
+                            <select
+                                value={selectedMonth}
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    setSelectedMonth(value === "all" ? "all" : parseInt(value));
+                                }}
+                                disabled={selectedYear === "all"}
+                                className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            >
+                                <option value="all">全月</option>
+                                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((month) => (
+                                    <option key={month} value={month}>{month}月</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* フィルタリング結果 */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <div>
+                                <p className="text-sm text-blue-700">
+                                    {selectedYear === "all" 
+                                        ? "全期間" 
+                                        : selectedMonth === "all" 
+                                            ? `${selectedYear}年` 
+                                            : `${selectedYear}年${selectedMonth}月`}
+                                    の報酬
+                                </p>
+                                <p className="text-2xl font-bold text-blue-800">
+                                    {formatCurrency(filteredTotal)}
+                                </p>
+                                <p className="text-sm text-blue-600">
+                                    {filteredContracts.length} 件
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 年間支払調書ダウンロード */}
+                    {availableYears.length > 0 && (
+                        <div className="border-t pt-4">
+                            <h4 className="font-medium text-secondary mb-3 flex items-center gap-2">
+                                <FileText size={18} />
+                                年間支払調書（確定申告用）
+                            </h4>
+                            <p className="text-sm text-gray-600 mb-3">
+                                確定申告に使用できる年間支払調書をPDFでダウンロードできます。
+                                <br />
+                                <span className="text-xs text-gray-500">※ 暦年（1月1日〜12月31日）ベースで集計されます。</span>
+                            </p>
+                            <div className="flex items-center gap-4">
+                                <select
+                                    value={paymentStatementYear}
+                                    onChange={(e) => setPaymentStatementYear(parseInt(e.target.value))}
+                                    className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                >
+                                    {availableYears.map((year) => (
+                                        <option key={year} value={year}>{year}年分</option>
+                                    ))}
+                                </select>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDownloadPaymentStatement(paymentStatementYear)}
+                                    className="flex items-center gap-2"
+                                >
+                                    <FileText size={16} />
+                                    ダウンロード
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
             {/* 報酬履歴カード */}
             <Card>
                 <CardHeader>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
                         <CardTitle className="flex items-center gap-2">
                             <History /> 報酬履歴
+                            {(selectedYear !== "all" || selectedMonth !== "all") && (
+                                <span className="text-sm font-normal text-gray-500">
+                                    （{selectedYear === "all" ? "全期間" : selectedMonth === "all" ? `${selectedYear}年` : `${selectedYear}年${selectedMonth}月`}）
+                                </span>
+                            )}
                         </CardTitle>
-                        {completedContracts.length > 0 && (
+                        {filteredContracts.length > 0 && (
                             <Button
                                 variant="outline"
                                 size="sm"
@@ -352,10 +541,10 @@ function PaymentSettingsContent() {
                         <div className="text-center py-8 text-gray-500">
                             読み込み中...
                         </div>
-                    ) : completedContracts.length === 0 ? (
+                    ) : filteredContracts.length === 0 ? (
                         <div className="text-center py-8 text-gray-500">
                             <AlertCircle className="mx-auto mb-2" size={32} />
-                            <p>まだ完了した案件がありません。</p>
+                            <p>{completedContracts.length === 0 ? "まだ完了した案件がありません。" : "選択した期間に該当するデータがありません。"}</p>
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
@@ -371,7 +560,7 @@ function PaymentSettingsContent() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {completedContracts.map((contract) => (
+                                        {filteredContracts.map((contract) => (
                                             <tr key={contract.id} className="border-b hover:bg-gray-50">
                                                 <td className="py-3 px-2">
                                                     <span className="font-medium">{contract.jobTitle}</span>
@@ -401,9 +590,9 @@ function PaymentSettingsContent() {
                                     </tbody>
                                 </table>
                             </div>
-                            {completedContracts.length > 10 && (
+                            {filteredContracts.length > 10 && (
                                 <p className="text-sm text-gray-500 mt-2 text-center">
-                                    {completedContracts.length}件中、スクロールで全件表示できます
+                                    {filteredContracts.length}件中、スクロールで全件表示できます
                                 </p>
                             )}
                         </div>
@@ -417,8 +606,9 @@ function PaymentSettingsContent() {
                     <h3 className="font-bold text-secondary mb-3">報酬受取に関する注意事項</h3>
                     <ul className="list-disc list-inside space-y-2 text-sm text-gray-600">
                         <li>報酬は、クライアントが検収を完了した時点でStripeアカウントに送金されます。</li>
-                        <li>Stripeから銀行口座への入金は、通常2〜3営業日かかります。</li>
-                        <li>報酬額からシステム手数料（5%+税）が差し引かれた金額が受取額となります。</li>
+                        <li><strong>銀行口座への入金は毎月25日</strong>に行われます。</li>
+                        <li><strong>入金手数料（入金額の0.25% + 250円）はワーカー負担</strong>となります。</li>
+                        <li>報酬額からシステム手数料（5%）が差し引かれた金額が受取額となります。</li>
                         <li>銀行口座情報の変更は、Stripeダッシュボードから行ってください。</li>
                     </ul>
                 </CardContent>

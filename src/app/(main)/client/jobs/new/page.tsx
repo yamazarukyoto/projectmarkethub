@@ -319,12 +319,13 @@ export default function PostJobPage() {
                         <div className="space-y-4 border-t pt-4">
                             <h3 className="font-medium text-gray-900">報酬設定</h3>
                             <Input
-                                label="予算金額 (円)"
+                                label="予算金額 (税込・円)"
                                 type="number"
-                                placeholder="50000"
+                                placeholder="55000"
                                 error={errors.budget?.message}
                                 {...register("budget", { valueAsNumber: true })}
                             />
+                            <p className="text-xs text-gray-500">※ 税込金額を入力してください。消費税10%が含まれます。</p>
                         </div>
 
                         <Input
@@ -401,17 +402,12 @@ export default function PostJobPage() {
                             <div className="bg-gray-50 p-4 rounded-lg border">
                                 <h4 className="text-sm font-bold text-gray-900 mb-2">お支払い金額（概算）</h4>
                                 <div className="space-y-1">
-                                    <div className="flex justify-between text-sm">
-                                        <span>予算金額 (税抜)</span>
+                                    <div className="flex justify-between font-bold text-lg">
+                                        <span>予算金額 (税込)</span>
                                         <span>{pendingJobData.budget?.toLocaleString()} 円</span>
                                     </div>
-                                    <div className="flex justify-between text-sm">
-                                        <span>消費税 (10%)</span>
-                                        <span>{Math.floor((pendingJobData.budget || 0) * 0.1).toLocaleString()} 円</span>
-                                    </div>
-                                    <div className="flex justify-between font-bold text-lg border-t pt-2 mt-2">
-                                        <span>合計</span>
-                                        <span>{Math.floor((pendingJobData.budget || 0) * 1.1).toLocaleString()} 円</span>
+                                    <div className="flex justify-between text-sm text-gray-500 border-t pt-2 mt-2">
+                                        <span>（税抜: {Math.round((pendingJobData.budget || 0) / 1.1).toLocaleString()}円 / 消費税: {((pendingJobData.budget || 0) - Math.round((pendingJobData.budget || 0) / 1.1)).toLocaleString()}円）</span>
                                     </div>
                                     <p className="text-xs text-gray-500 mt-2">※プロジェクト方式の場合、実際の契約金額はワーカーとの交渉により決定します。この段階では支払いは発生しません。</p>
                                 </div>

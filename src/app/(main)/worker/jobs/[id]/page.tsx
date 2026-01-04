@@ -236,7 +236,7 @@ export default function WorkerJobDetailPage() {
                             <div className="flex flex-col sm:flex-row flex-wrap gap-4 text-sm text-gray-600">
                                 <div className="flex items-center gap-1">
                                     <DollarSign size={16} />
-                                    <span>予算: {job.budget?.toLocaleString()}円 (固定報酬)</span>
+                                    <span>予算: {job.budget?.toLocaleString()}円 (税込・固定報酬)</span>
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <Calendar size={16} />
@@ -488,7 +488,7 @@ export default function WorkerJobDetailPage() {
                                     )}
 
                                     <Input
-                                        label="提案金額 (円)"
+                                        label="提案金額 (税込・円)"
                                         type="number"
                                         placeholder="50000"
                                         error={errors.price?.message}

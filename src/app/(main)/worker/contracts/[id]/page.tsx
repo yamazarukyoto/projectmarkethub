@@ -138,15 +138,15 @@ export default function WorkerContractDetailPage() {
                             </h3>
                             <div className="text-sm">
                                 <div className="flex justify-between gap-4">
-                                    <span>契約金額 (税抜):</span>
-                                    <span>{contract.amount.toLocaleString()}円</span>
+                                    <span>契約金額 (税込):</span>
+                                    <span>{contract.totalAmount.toLocaleString()}円</span>
                                 </div>
                                 <div className="flex justify-between gap-4 text-gray-500">
-                                    <span>システム手数料 (5%):</span>
+                                    <span>システム手数料 5% (税込):</span>
                                     <span>-{contract.platformFee.toLocaleString()}円</span>
                                 </div>
-                                <div className="flex justify-between gap-4 font-bold border-t pt-1 mt-1">
-                                    <span>受取予定額:</span>
+                                <div className="flex justify-between gap-4 font-bold border-t pt-1 mt-1 text-primary">
+                                    <span>受取予定額 (税込):</span>
                                     <span>{contract.workerReceiveAmount.toLocaleString()}円</span>
                                 </div>
                                 {contract.status === 'completed' && (

@@ -367,10 +367,10 @@ export default function MessageRoomPage() {
                             <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                                 <div className="flex items-center gap-2 text-gray-600">
                                     <DollarSign size={18} />
-                                    <span className="text-sm font-medium">契約金額 (税抜)</span>
+                                    <span className="text-sm font-medium">契約金額 (税込)</span>
                                 </div>
                                     <span className="text-lg font-bold text-secondary">
-                                        {contract.amount.toLocaleString()}円
+                                        {contract.totalAmount.toLocaleString()}円
                                     </span>
                                 </div>
                                 
@@ -587,7 +587,7 @@ export default function MessageRoomPage() {
                             <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                                 <div className="flex items-center gap-2 text-gray-600">
                                     <DollarSign size={18} />
-                                    <span className="text-sm font-medium">契約金額 (税抜)</span>
+                                    <span className="text-sm font-medium">契約金額 (税込)</span>
                                 </div>
                                 <span className="text-lg font-bold text-secondary">
                                     {proposal.price.toLocaleString()}円
@@ -874,7 +874,7 @@ export default function MessageRoomPage() {
                             </p>
                             <div className="bg-gray-50 p-4 rounded-lg space-y-2">
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-gray-500">契約金額 (税抜)</span>
+                                    <span className="text-gray-500">契約金額 (税込)</span>
                                     <span className="font-bold">{proposal.price.toLocaleString()}円</span>
                                 </div>
                                 <div className="flex justify-between text-sm">

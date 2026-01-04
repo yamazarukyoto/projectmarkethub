@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@fontsource/noto-sans-jp": "^5.2.8",
     "@hookform/resolvers": "^5.2.2",
     "@stripe/react-stripe-js": "^5.4.0",
     "@stripe/stripe-js": "^8.5.2",
@@ -17,6 +18,7 @@
     "dotenv": "^17.2.3",
     "firebase": "^12.6.0",
     "firebase-admin": "^13.6.0",
+    "jspdf": "^4.0.0",
     "lucide-react": "^0.554.0",
     "next": "16.0.3",
     "puppeteer": "^24.34.0",
