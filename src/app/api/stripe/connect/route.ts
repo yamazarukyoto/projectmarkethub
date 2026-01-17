@@ -111,21 +111,18 @@ export async function POST(req: Request) {
              return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: corsHeaders });
         }
 
-        // Stripeが無効な場合のデモ動作
+        // Stripeが無効な場合はエラーを返す（デモアカウントは作成しない）
         if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'dummy_key') {
-            console.warn("Stripe is not configured. Simulating Connect flow.");
-            
-            await adminDb.collection("users").doc(userId).update({
-                stripeAccountId: "acct_demo_" + Date.now(),
-            });
-
+            console.error("Stripe is not configured. Cannot create Connect account.");
             return NextResponse.json({ 
-                url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/account/worker/payout?success=true` 
-            }, { headers: corsHeaders });
+                error: "Stripeが設定されていません。管理者にお問い合わせください。"
+            }, { status: 500, headers: corsHeaders });
         }
 
         // Create a Stripe Connect account
-        // 入金スケジュール: 毎月25日（入金手数料はワーカー負担）
+        // 入金スケジュール: 手動（ユーザーが任意のタイミングで入金リクエスト）
+        // 入金手数料: 0.25% + 450円（ワーカー負担）
+        // 最低入金額: 500円
         const account = await stripe.accounts.create({
             type: "express",
             country: "JP",
@@ -136,8 +133,7 @@ export async function POST(req: Request) {
             settings: {
                 payouts: {
                     schedule: {
-                        interval: "monthly",
-                        monthly_anchor: 25,  // 毎月25日に入金
+                        interval: "manual",  // 手動入金（ユーザーが任意のタイミングでリクエスト）
                     },
                 },
             },
@@ -163,17 +159,10 @@ export async function POST(req: Request) {
         const errorMessage = error.message || "Unknown error occurred";
         const errorType = error.type || "UnknownType";
         
-        console.warn("Stripe Connect failed, falling back to demo.");
-        
-        if (userId) {
-             await adminDb.collection("users").doc(userId).update({
-                stripeAccountId: "acct_demo_fallback_" + Date.now(),
-            });
-            return NextResponse.json({ 
-                url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/account/worker/payout?success=true` 
-            }, { headers: corsHeaders });
-        }
-
-        return NextResponse.json({ error: errorMessage, type: errorType }, { status: 500, headers: corsHeaders });
+        // エラー時はデモアカウントを作成せず、エラーを返す
+        return NextResponse.json({ 
+            error: `Stripe連携に失敗しました: ${errorMessage}`,
+            type: errorType 
+        }, { status: 500, headers: corsHeaders });
     }
 }

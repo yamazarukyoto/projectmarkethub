@@ -37,16 +37,15 @@ export async function GET(req: Request) {
             }, { headers: corsHeaders });
         }
 
-        // デモアカウントの場合
+        // デモアカウントの場合は「未連携」として扱う
+        // （開発時のフォールバックで作成されたダミーアカウント）
         if (stripeAccountId.startsWith("acct_demo")) {
+            console.warn(`User ${userId} has demo Stripe account: ${stripeAccountId}. Treating as unconnected.`);
             return NextResponse.json({ 
-                connected: true,
-                accountId: stripeAccountId,
-                payoutsEnabled: true,
-                chargesEnabled: true,
-                detailsSubmitted: true,
-                status: "active",
-                isDemo: true
+                connected: false,
+                status: "unconnected",
+                isDemo: true,
+                message: "デモアカウントが設定されています。正しくStripe連携を行ってください。"
             }, { headers: corsHeaders });
         }
 
